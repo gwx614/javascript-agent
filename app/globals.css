@@ -3,10 +3,35 @@
 @tailwind utilities;
 
 /* ============================================================
-   shadcn/ui CSS 变量（暗色主题）
+   shadcn/ui CSS 变量（支持白天/暗黑主题）
    ============================================================ */
 @layer base {
+  /* 白天主题（默认） */
   :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 263.4 70% 50.4%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 263.4 70% 50.4%;
+    --radius: 0.75rem;
+  }
+
+  /* 暗黑主题 */
+  .dark {
     --background: 222.2 84% 4.9%;
     --foreground: 210 40% 98%;
     --card: 222.2 84% 4.9%;
@@ -26,7 +51,6 @@
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
     --ring: 263.4 70% 50.4%;
-    --radius: 0.75rem;
   }
 }
 
@@ -37,7 +61,26 @@
 
   body {
     @apply bg-background text-foreground;
-    /* 背景使用深色渐变，营造沉浸感 */
+    min-height: 100vh;
+  }
+
+  /* 白天主题背景 */
+  :root body {
+    background: radial-gradient(
+        ellipse at top left,
+        rgba(124, 58, 237, 0.05) 0%,
+        transparent 50%
+      ),
+      radial-gradient(
+        ellipse at bottom right,
+        rgba(16, 185, 129, 0.03) 0%,
+        transparent 50%
+      ),
+      hsl(0 0% 100%);
+  }
+
+  /* 暗黑主题背景 */
+  .dark body {
     background: radial-gradient(
         ellipse at top left,
         rgba(124, 58, 237, 0.08) 0%,
@@ -49,23 +92,31 @@
         transparent 50%
       ),
       hsl(222.2 84% 4.9%);
-    min-height: 100vh;
   }
 
-  /* 自定义滚动条样式 */
-  ::-webkit-scrollbar {
+  /* 自定义滚动条样式 - 白天主题 */
+  :root ::-webkit-scrollbar {
     width: 4px;
   }
 
-  ::-webkit-scrollbar-track {
+  :root ::-webkit-scrollbar-track {
     background: transparent;
   }
 
-  ::-webkit-scrollbar-thumb {
+  :root ::-webkit-scrollbar-thumb {
+    @apply bg-gray-300 rounded-full;
+  }
+
+  :root ::-webkit-scrollbar-thumb:hover {
+    @apply bg-gray-400;
+  }
+
+  /* 自定义滚动条样式 - 暗黑主题 */
+  .dark ::-webkit-scrollbar-thumb {
     @apply bg-white/10 rounded-full;
   }
 
-  ::-webkit-scrollbar-thumb:hover {
+  .dark ::-webkit-scrollbar-thumb:hover {
     @apply bg-white/20;
   }
 }

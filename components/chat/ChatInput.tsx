@@ -45,7 +45,7 @@ export function ChatInput({ isLoading, onSend, onStop }: ChatInputProps) {
 
   return (
     <div className="px-4 pb-4 pt-2">
-      <div className="relative flex items-end gap-2 bg-white/5 border border-white/10 hover:border-white/20 focus-within:border-violet-500/50 rounded-2xl p-3 transition-all duration-200">
+      <div className="relative flex items-end gap-2 bg-card/50 border border-border hover:border-border/80 focus-within:border-primary/50 rounded-2xl p-3 transition-all duration-200">
         {/* 文本输入区域 */}
         <textarea
           ref={textareaRef}
@@ -56,7 +56,7 @@ export function ChatInput({ isLoading, onSend, onStop }: ChatInputProps) {
           placeholder="向 JS 小智提问...（Enter 发送，Shift+Enter 换行）"
           rows={1}
           className={cn(
-            "flex-1 bg-transparent text-white placeholder:text-gray-500",
+            "flex-1 bg-transparent text-foreground placeholder:text-muted-foreground",
             "text-sm leading-relaxed resize-none outline-none",
             "min-h-[24px] max-h-[200px] overflow-y-auto",
             "disabled:opacity-50 disabled:cursor-not-allowed"
@@ -73,7 +73,7 @@ export function ChatInput({ isLoading, onSend, onStop }: ChatInputProps) {
           <button
             type="button"
             onClick={onStop}
-            className="flex-shrink-0 w-8 h-8 rounded-xl bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 text-red-400 flex items-center justify-center transition-all duration-200"
+            className="flex-shrink-0 w-8 h-8 rounded-xl bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 text-red-500 flex items-center justify-center transition-all duration-200"
           >
             <Square className="w-3.5 h-3.5 fill-current" />
           </button>
@@ -86,7 +86,7 @@ export function ChatInput({ isLoading, onSend, onStop }: ChatInputProps) {
               "flex-shrink-0 w-8 h-8 rounded-xl flex items-center justify-center transition-all duration-200",
               input.trim()
                 ? "bg-gradient-to-br from-violet-600 to-purple-700 text-white hover:from-violet-500 hover:to-purple-600 shadow-lg shadow-violet-500/30"
-                : "bg-white/5 text-gray-600 cursor-not-allowed"
+                : "bg-muted text-muted-foreground cursor-not-allowed"
             )}
           >
             <Send className="w-3.5 h-3.5" />
@@ -94,7 +94,7 @@ export function ChatInput({ isLoading, onSend, onStop }: ChatInputProps) {
         )}
       </div>
 
-      <p className="text-center text-xs text-gray-600 mt-2">
+      <p className="text-center text-xs text-muted-foreground mt-2">
         AI 回答仅供参考，建议结合官方文档学习
       </p>
     </div>

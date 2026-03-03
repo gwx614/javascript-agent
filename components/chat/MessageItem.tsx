@@ -49,16 +49,16 @@ export function MessageItem({ message }: MessageItemProps) {
         )}
       </div>
 
-        <div
-          className={cn(
-            "max-w-[75%] rounded-2xl px-4 py-3 text-sm leading-relaxed",
-            isUser
-              ? "bg-gradient-to-br from-violet-600 to-purple-700 text-white rounded-tr-sm"
-              : "bg-white/5 border border-white/10 text-gray-100 rounded-tl-sm"
-          )}
-        >
-          <div className="whitespace-pre-wrap break-words">{textContent}</div>
-        </div>
+      <div
+        className={cn(
+          "max-w-[75%] rounded-2xl px-4 py-3 text-sm leading-relaxed",
+          isUser
+            ? "bg-gradient-to-br from-violet-600 to-purple-700 text-white rounded-tr-sm"
+            : "bg-muted/50 border border-border text-foreground rounded-tl-sm"
+        )}
+      >
+        <div className="whitespace-pre-wrap break-words">{textContent}</div>
+      </div>
     </div>
   );
 }

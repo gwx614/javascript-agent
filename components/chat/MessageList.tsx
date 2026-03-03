@@ -38,8 +38,8 @@ export function MessageList({ messages, isLoading }: MessageListProps) {
         </div>
 
         <div className="space-y-2">
-          <h2 className="text-2xl font-bold text-white">你好，我是 JS 小智！</h2>
-          <p className="text-gray-400 max-w-sm leading-relaxed">
+          <h2 className="text-2xl font-bold text-foreground">你好，我是 JS 小智！</h2>
+          <p className="text-muted-foreground max-w-sm leading-relaxed">
             你的专属 JavaScript 学习导师。无论是基础语法还是高级特性，我都能帮你搞定。
           </p>
         </div>
@@ -53,7 +53,7 @@ export function MessageList({ messages, isLoading }: MessageListProps) {
           ].map((suggestion) => (
             <div
               key={suggestion}
-              className="px-3 py-2 text-xs text-left text-gray-300 bg-white/5 border border-white/10 rounded-xl"
+              className="px-3 py-2 text-xs text-left text-foreground/70 bg-muted/50 border border-border rounded-xl hover:bg-muted transition-colors cursor-pointer"
             >
               💡 {suggestion}
             </div>
@@ -75,10 +75,10 @@ export function MessageList({ messages, isLoading }: MessageListProps) {
           <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center flex-shrink-0">
             <Bot className="w-4 h-4 text-white" />
           </div>
-          <div className="flex items-center gap-1.5 px-4 py-3 bg-white/5 border border-white/10 rounded-2xl rounded-tl-sm">
-            <span className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce [animation-delay:0ms]" />
-            <span className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce [animation-delay:150ms]" />
-            <span className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce [animation-delay:300ms]" />
+          <div className="flex items-center gap-1.5 px-4 py-3 bg-muted/50 border border-border rounded-2xl rounded-tl-sm">
+            <span className="w-2 h-2 bg-emerald-500 rounded-full animate-bounce [animation-delay:0ms]" />
+            <span className="w-2 h-2 bg-emerald-500 rounded-full animate-bounce [animation-delay:150ms]" />
+            <span className="w-2 h-2 bg-emerald-500 rounded-full animate-bounce [animation-delay:300ms]" />
           </div>
         </div>
       )}

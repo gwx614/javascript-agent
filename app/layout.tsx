@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { ThemeProvider } from "@/components/theme-provider";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 export const metadata: Metadata = {
   title: "JS 小智 - JavaScript 智能学习助手",
@@ -15,10 +17,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="zh-CN" className="dark" suppressHydrationWarning>
+    <html lang="zh-CN" suppressHydrationWarning>
       {/* 使用系统字体栈，避免访问 Google Fonts CDN */}
       <body className="font-sans antialiased" suppressHydrationWarning>
-        {children}
+        <ThemeProvider>
+          <ThemeToggle />
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   );

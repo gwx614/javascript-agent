@@ -36,8 +36,8 @@ export async function POST(req: Request) {
         };
       });
 
-    const apiKey = process.env.ZHIPU_API_KEY || process.env.OPENAI_API_KEY;
-    const url = "https://open.bigmodel.cn/api/paas/v4/chat/completions";
+    const apiKey = process.env.DASHSCOPE_API_KEY || process.env.OPENAI_API_KEY;
+    const url = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions";
     
     const requestBody = {
       model: DEFAULT_MODEL,
@@ -61,8 +61,8 @@ export async function POST(req: Request) {
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("[Zhipu API Error]:", errorText);
-      throw new Error(`Zhipu API error: ${response.status} ${errorText}`);
+      console.error("[AI API Error]:", errorText);
+      throw new Error(`AI API error: ${response.status} ${errorText}`);
     }
 
     const encoder = new TextEncoder();
