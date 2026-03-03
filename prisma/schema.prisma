@@ -1,0 +1,81 @@
+// ============================================================
+// Prisma Schema 定义 - JavaScript 学习 Agent 数据库模型
+// 数据库：Supabase (PostgreSQL + pgvector)
+// ============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+
+// ============================================================
+// 用户模型
+// 存储学习用户的基本信息和学习偏好
+// ============================================================
+model User {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // 基本信息
+  email     String   @unique
+  name      String?
+  avatarUrl String?  @map("avatar_url")
+
+  // 学习偏好
+  skillLevel String  @default("beginner") @map("skill_level")
+  // beginner | intermediate | advanced
+
+  // 关联
+  chatSessions ChatSession[]
+
+  @@map("users")
+}
+
+// ============================================================
+// 对话会话模型
+// 每个学习会话对应一个独立的对话记录
+// ============================================================
+model ChatSession {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // 会话标题（首次对话后自动生成）
+  title     String  @default("新的学习会话")
+  // 会话是否已归档
+  archived  Boolean @default(false)
+
+  // 关联用户（可选，支持匿名用户）
+  userId    String?  @map("user_id")
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  // 关联的消息列表
+  messages  ChatMessage[]
+
+  @@map("chat_sessions")
+}
+
+// ============================================================
+// 聊天消息模型
+// 记录对话中的每一条消息（用户或 AI）
+// ============================================================
+model ChatMessage {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // 消息角色：user | assistant | system
+  role      String
+  // 消息内容（Markdown 格式）
+  content   String
+
+  // 所属会话
+  sessionId String      @map("session_id")
+  session   ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@map("chat_messages")
+}

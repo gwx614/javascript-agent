@@ -1,0 +1,7 @@
+// 记录 prettier 忽略的文件和目录
+.next
+node_modules
+dist
+.env.local
+.env
+tests
