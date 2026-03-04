@@ -4,6 +4,8 @@ import { cn } from "@/lib/utils";
 import type { UIMessage } from "ai";
 import { isTextUIPart } from "ai";
 import { Bot, User } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 interface MessageItemProps {
   message: UIMessage;
@@ -57,7 +59,15 @@ export function MessageItem({ message }: MessageItemProps) {
             : "bg-muted/50 border border-border text-foreground rounded-tl-sm"
         )}
       >
-        <div className="whitespace-pre-wrap break-words">{textContent}</div>
+        {isUser ? (
+          <div className="whitespace-pre-wrap break-words">{textContent}</div>
+        ) : (
+          <div className="prose prose-sm dark:prose-invert max-w-none break-words">
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              {textContent}
+            </ReactMarkdown>
+          </div>
+        )}
       </div>
     </div>
   );
