@@ -4,11 +4,13 @@
 // ============================================================
 
 generator client {
-  provider = "prisma-client-js"
+  provider   = "prisma-client-js"
+  engineType = "library"
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
+  url      = "file:D:/work/JavascriptAgent/dev.db"
 }
 
 
@@ -21,8 +23,12 @@ model User {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
+  // 认证信息
+  username  String   @unique
+  password  String   // 简单系统，目前明文存储
+
   // 基本信息
-  email     String   @unique
+  email     String?  @unique
   name      String?
   avatarUrl String?  @map("avatar_url")
 

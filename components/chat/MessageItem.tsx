@@ -38,7 +38,7 @@ export function MessageItem({ message }: MessageItemProps) {
         className={cn(
           "flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-white",
           isUser
-            ? "bg-gradient-to-br from-violet-500 to-purple-600"
+            ? "bg-gradient-to-br from-blue-500 to-cyan-500"
             : "bg-gradient-to-br from-emerald-500 to-teal-600"
         )}
       >
@@ -53,7 +53,7 @@ export function MessageItem({ message }: MessageItemProps) {
         className={cn(
           "max-w-[75%] rounded-2xl px-4 py-3 text-sm leading-relaxed",
           isUser
-            ? "bg-gradient-to-br from-violet-600 to-purple-700 text-white rounded-tr-sm"
+            ? "bg-gradient-to-br from-blue-500 to-cyan-500 text-white rounded-tr-sm"
             : "bg-muted/50 border border-border text-foreground rounded-tl-sm"
         )}
       >

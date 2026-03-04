@@ -29,7 +29,7 @@ export function MessageList({ messages, isLoading }: MessageListProps) {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-6 p-8 text-center">
         <div className="relative">
-          <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-violet-600 to-purple-700 flex items-center justify-center shadow-2xl shadow-violet-500/30">
+          <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center shadow-2xl shadow-blue-500/30">
             <Bot className="w-10 h-10 text-white" />
           </div>
           <div className="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-emerald-500 flex items-center justify-center">
