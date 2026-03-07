@@ -6,21 +6,22 @@ import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { MessageList } from "@/components/chat/MessageList";
 import { ChatInput } from "@/components/chat/ChatInput";
-import { Bot, Github, BookOpen, LogOut, Loader2, Settings } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { LearningProfileModal } from "@/components/LearningProfileModal";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 
 export default function ChatPage() {
   const router = useRouter();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [username, setUsername] = useState("");
   const [showOnboarding, setShowOnboarding] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
+  const [user, setUser] = useState<any>(null);
 
   const { messages, sendMessage, status, stop } = useChat({
     transport: new DefaultChatTransport({
-      api: "/api/chat"
+      api: "/api/chat",
+      headers: user ? {
+        "x-user-data": encodeURIComponent(JSON.stringify(user))
+      } : undefined
     })
   });
 
@@ -31,12 +32,13 @@ export default function ChatPage() {
       router.replace("/login");
     } else {
       try {
-        const user = JSON.parse(userStr);
-        if (user && user.username) {
-          setUsername(user.username);
+        const parsedUser = JSON.parse(userStr);
+        if (parsedUser && parsedUser.username) {
+          setUsername(parsedUser.username);
+          setUser(parsedUser);
           setIsAuthenticated(true);
           
-          // 开发阶段：强制每次进入都显示
+          // 如果用户已登录，每次刷新都展示学习问卷弹窗 (开发或特定需求)
           setShowOnboarding(true);
         } else {
           router.replace("/login");
@@ -47,11 +49,20 @@ export default function ChatPage() {
     }
   }, [router]);
 
-  // 处理退出登录
-  const handleLogout = () => {
-    localStorage.removeItem("user");
-    router.replace("/login");
-  };
+  // 监听角色定位更新事件
+  useEffect(() => {
+    const handleProfileUpdate = () => {
+      const userStr = localStorage.getItem("user");
+      if (userStr) {
+        try {
+          const parsedUser = JSON.parse(userStr);
+          setUser(parsedUser);
+        } catch (e) {}
+      }
+    };
+    window.addEventListener("userProfileUpdated", handleProfileUpdate);
+    return () => window.removeEventListener("userProfileUpdated", handleProfileUpdate);
+  }, []);
 
   const handleOnboardingComplete = () => {
     localStorage.setItem("onboarded", "true");
@@ -78,73 +89,13 @@ export default function ChatPage() {
   }
 
   return (
-    <div className="flex flex-col h-screen max-w-3xl mx-auto">
+    <div className="flex flex-col h-[calc(100vh-73px)] max-w-3xl mx-auto w-full">
       {showOnboarding && (
         <LearningProfileModal 
           mode="onboarding" 
           onComplete={handleOnboardingComplete} 
         />
       )}
-      {showSettings && (
-        <LearningProfileModal 
-          mode="settings" 
-          onComplete={() => {}} 
-          onClose={() => setShowSettings(false)} 
-        />
-      )}
-      
-      {/* ========== 顶部标题栏 ========== */}
-      <header className="flex items-center justify-between px-6 py-4 border-b border-border bg-card/50 backdrop-blur-sm flex-shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-primary flex items-center justify-center shadow-lg shadow-primary/20">
-            <Bot className="w-6 h-6 text-primary-foreground" />
-          </div>
-          <div>
-            <h1 className="text-sm font-bold text-foreground">JS 小智</h1>
-            <p className="text-xs text-muted-foreground mr-1">@{username}</p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-1">
-          {/* 在线状态 */}
-          <Badge variant="secondary" className="mr-3 gap-1.5 py-1 px-3 rounded-full bg-emerald-500/10 text-emerald-600 border-none hover:bg-emerald-500/20 transition-colors">
-            <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-            在线
-          </Badge>
-
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setShowSettings(true)}
-            className="w-9 h-9 text-muted-foreground hover:text-foreground rounded-xl"
-            title="学习资料设置"
-          >
-            <Settings className="w-5 h-5" />
-          </Button>
-          
-          <Button variant="ghost" size="icon" className="w-9 h-9 text-muted-foreground hover:text-foreground rounded-xl" asChild>
-            <a href="https://developer.mozilla.org/zh-CN/docs/Web/JavaScript" target="_blank" rel="noopener noreferrer" title="MDN 文档">
-              <BookOpen className="w-5 h-5" />
-            </a>
-          </Button>
-
-          <Button variant="ghost" size="icon" className="w-9 h-9 text-muted-foreground hover:text-foreground rounded-xl" asChild>
-            <a href="https://github.com" target="_blank" rel="noopener noreferrer" title="GitHub">
-              <Github className="w-5 h-5" />
-            </a>
-          </Button>
-
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleLogout}
-            className="w-9 h-9 text-muted-foreground hover:text-red-500 rounded-xl"
-            title="退出登录"
-          >
-            <LogOut className="w-5 h-5" />
-          </Button>
-        </div>
-      </header>
 
       {/* ========== 消息列表区域 ========== */}
       <main className="flex-1 overflow-y-auto">

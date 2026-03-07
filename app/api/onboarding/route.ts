@@ -10,20 +10,17 @@ export async function POST(req: Request) {
       .join("\n\n");
 
     const systemPrompt = `你是一个资深的 JavaScript 导师。
-    根据用户提交的 10 道详细学习情况调研问卷（JSON），请生成一份结构化的学习分析报告。
+    根据用户提交的详细学习情况调研问卷，请直接为该用户生成一个准确的【专属角色定位】。
     
     用户的调研回答如下：
     ${promptContext}
 
-    报告必须包含以下板块：
-    1. 【现状与特质洞察】：基于用户的背景、痛点和目标，深入分析其学习特质。
-    2. 【定制化学习路径】：给出前 3 个阶段的具体行动建议和要掌握的核心概念。
-    3. 【避坑指南】：针对用户的难点痛点，给出 1~2 条前车之鉴。
-    4. 【导师寄语】：一句温暖且激励的话。
+    要求：
+    绝对不要输出任何无关的寒暄、废话或多余的排版格式。请严格遵循以下输出结构：
     
-    格式要求：使用 Markdown 排版。保持在400字左右，语气专业且温暖。
+    【角色定位】：[填写一个简短有力、响亮的角色名]
     
-    进阶要求（可选）：针对该用户的目标，在末尾附赠一个针对他痛点或基础水平的思考小挑战。`;
+    [正文：用一段100~200字左右的连贯文字，简单准确地结合问卷介绍他为什么属于这个定位]`;
 
     const apiKey = process.env.DASHSCOPE_API_KEY || process.env.OPENAI_API_KEY;
     const url = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions";

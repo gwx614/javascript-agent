@@ -13,6 +13,18 @@ export async function POST(req: Request) {
   try {
     const payload = await req.json();
     const { messages } = payload;
+    
+    // 从 headers 中读取 user 数据 (前端通过 DefaultChatTransport 传入)
+    let user = null;
+    const userHeader = req.headers.get("x-user-data");
+    if (userHeader) {
+      try {
+        user = JSON.parse(decodeURIComponent(userHeader));
+        console.log("User data from header:", user);
+      } catch (e) {
+        console.error("Failed to parse user header", e);
+      }
+    }
 
     const coreMessages = messages
       .filter((m: any) => m.role === "user" || m.role === "assistant")
@@ -39,10 +51,15 @@ export async function POST(req: Request) {
     const apiKey = process.env.DASHSCOPE_API_KEY || process.env.OPENAI_API_KEY;
     const url = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions";
     
+    // 注入角色的系统提示词
+    const dynamicSystemPrompt = user?.rolePosition 
+      ? `${JS_LEARNING_SYSTEM_PROMPT}\n\n当前用户的专属角色定位是：【${user.rolePosition}】。请你在接下来的所有回复中，严格保持这个角色定位对应的口吻、辅导方式和交流深度。`
+      : JS_LEARNING_SYSTEM_PROMPT;
+
     const requestBody = {
       model: DEFAULT_MODEL,
       messages: [
-        { role: "system", content: JS_LEARNING_SYSTEM_PROMPT },
+        { role: "system", content: dynamicSystemPrompt },
         ...coreMessages
       ],
       temperature: 0.7,

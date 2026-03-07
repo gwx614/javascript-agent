@@ -33,8 +33,12 @@ model User {
   avatarUrl String?  @map("avatar_url")
 
   // 学习偏好
-  skillLevel String  @default("beginner") @map("skill_level")
+  skillLevel   String  @default("beginner") @map("skill_level")
   // beginner | intermediate | advanced
+  
+  // 角色定位 (AI 评估生成)
+  rolePosition String? @map("role_position")
+  roleReport   String? @map("role_report")
 
   // 关联
   chatSessions ChatSession[]

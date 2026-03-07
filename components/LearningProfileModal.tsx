@@ -3,21 +3,9 @@
 import { useState, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { 
-  Loader2, 
-  ArrowRight, 
-  CheckCircle2, 
-  Target, 
-  BrainCircuit, 
-  Clock, 
-  Layout, 
-  Code2, 
-  AlertCircle, 
-  Briefcase,
-  Sparkles,
-  Save
-} from "lucide-react";
+import { Loader2, ArrowRight, CheckCircle2, Target, BrainCircuit, Clock, Layout, Code2, AlertCircle, Briefcase, Sparkles, Save } from "lucide-react";
 import { formQuestions, defaultFormData, Question } from "@/lib/onboardingConfig";
+import { CourseSelection } from "./CourseSelection";
 
 // Shadcn UI Components
 import {
@@ -45,9 +33,10 @@ interface LearningProfileModalProps {
 }
 
 export function LearningProfileModal({ mode, onComplete, onClose }: LearningProfileModalProps) {
-  const [step, setStep] = useState(mode === "onboarding" ? 1 : 2);
+  const [step, setStep] = useState(mode === "onboarding" ? 1 : 3);
   const [loading, setLoading] = useState(false);
   const [report, setReport] = useState("");
+  const [roleName, setRoleName] = useState("");
   const [formData, setFormData] = useState(defaultFormData);
 
   useEffect(() => {
@@ -59,23 +48,61 @@ export function LearningProfileModal({ mode, onComplete, onClose }: LearningProf
         console.error("Failed to parse learningProfile", e);
       }
     }
-  }, []);
+    
+    // 如果是设置模式，尝试恢复已有的角色名称
+    if (mode === "settings") {
+      const userStr = localStorage.getItem("user");
+      if (userStr) {
+        try {
+          const user = JSON.parse(userStr);
+          if (user.rolePosition) {
+            setRoleName(user.rolePosition);
+            if (user.roleReport) {
+              setReport(user.roleReport);
+            } else {
+              setReport("这是你当前保存的专属角色！如果想改变学习侧重点，可以点击重新定位获取全新角色。");
+            }
+          }
+        } catch (e) {}
+      }
+    }
+  }, [mode]);
 
   const handleNext = () => setStep(step + 1);
 
   const handleSkipAI = () => {
     localStorage.setItem("onboarded", "true");
-    onComplete();
+    setStep(4);
   };
 
-  const handleSaveSettings = () => {
+  const handleSaveSettings = async () => {
     localStorage.setItem("learningProfile", JSON.stringify(formData));
+    
+    // Also try saving to DB if user is logged in
+    const userStr = localStorage.getItem("user");
+    if (userStr) {
+      try {
+        const user = JSON.parse(userStr);
+        await fetch("/api/user/profile", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            username: user.username,
+            rolePosition: roleName,
+            formData
+          })
+        });
+      } catch (e) {
+        console.error("Failed to save profile to DB", e);
+      }
+    }
+
     if (onClose) onClose();
   };
 
-  const handleGenerateReport = async () => {
+  const handleGenerateRole = async () => {
     setLoading(true);
-    setStep(4);
+    setStep(3);
     
     localStorage.setItem("learningProfile", JSON.stringify(formData));
     localStorage.setItem("onboarded", "true");
@@ -96,11 +123,48 @@ export function LearningProfileModal({ mode, onComplete, onClose }: LearningProf
       const data = await res.json();
       if (data.report) {
         setReport(data.report);
+        // Try to extract a short role name from the report if provided in a specific format, otherwise use a default
+        const match = data.report.match(/【角色定位】[:：]\s*(.+?)(?=\n|$)/);
+        const extractedRole = match ? match[1].trim() : "JavaScript 探索者";
+        setRoleName(extractedRole);
+
+        // Save to Database
+        const userStr = localStorage.getItem("user");
+        if (userStr) {
+          try {
+            const user = JSON.parse(userStr);
+            const saveRes = await fetch("/api/user/profile", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                username: user.username,
+                rolePosition: extractedRole,
+                roleReport: data.report,
+                formData
+              })
+            });
+            const saveData = await saveRes.json();
+            if (saveData.success) {
+               console.log("Profile saved to db:", saveData);
+               localStorage.setItem("user", JSON.stringify({ 
+                 ...user, 
+                 rolePosition: extractedRole,
+                 roleReport: data.report 
+               }));
+               // trigger an event to layout/page to know user profile updated
+               window.dispatchEvent(new Event("userProfileUpdated"));
+            }
+          } catch (e) {
+            console.error("Failed to save profile to DB", e);
+          }
+        }
       } else {
-        setReport("生成失败，未获取到报告。");
+        setReport("生成失败，未获取到角色定位。");
+        setRoleName("未知角色");
       }
     } catch (e) {
-      setReport("网络错误，导致 AI 无法生成报告。");
+      setReport("网络错误，导致 AI 无法生成角色定位。");
+      setRoleName("未知角色");
     } finally {
       setLoading(false);
     }
@@ -215,7 +279,7 @@ export function LearningProfileModal({ mode, onComplete, onClose }: LearningProf
           <div className="flex flex-col h-[90vh] max-h-[850px] animate-in slide-in-from-right duration-500">
             <DialogHeader className="p-8 pb-4">
               <DialogTitle className="text-2xl font-black tracking-tight">个性化你的学习</DialogTitle>
-              <DialogDescription className="text-base">填写这些信息，AI 将为你推荐最适合的学习深度。</DialogDescription>
+              <DialogDescription className="text-base">填写这些信息，AI 将构建专属于你的学习角色（3-5分钟）。</DialogDescription>
             </DialogHeader>
             
             <ScrollArea className="flex-1 px-8">
@@ -239,82 +303,78 @@ export function LearningProfileModal({ mode, onComplete, onClose }: LearningProf
             <div className="p-8 pt-4 border-t bg-muted/5 flex justify-end gap-3 rounded-b-2xl">
               {mode === "settings" ? (
                 <>
-                  <Button variant="ghost" onClick={onClose} className="rounded-lg font-bold">取消</Button>
-                  <Button onClick={handleSaveSettings} className="rounded-lg font-bold shadow-lg shadow-primary/20">
-                    <Save className="mr-2 w-4 h-4" /> 保存修改
+                  <Button variant="ghost" onClick={() => setStep(3)} className="rounded-lg font-bold">返回</Button>
+                  <Button onClick={handleGenerateRole} className="rounded-lg font-bold shadow-lg shadow-primary/20">
+                    <Sparkles className="mr-2 w-4 h-4" /> 重新生成角色
                   </Button>
                 </>
               ) : (
-                <Button onClick={handleNext} className="h-12 px-10 rounded-lg font-bold shadow-lg shadow-primary/20">
-                  提交并继续
+                <Button onClick={handleGenerateRole} className="h-12 px-10 rounded-lg font-bold shadow-lg shadow-primary/20">
+                  提交并生成角色
                 </Button>
               )}
             </div>
           </div>
         )}
 
-        {/* Step 3: Confirmation (Onboarding Only) */}
-        {step === 3 && mode === "onboarding" && (
-          <div className="p-10 text-center animate-in slide-in-from-right duration-500">
-            <div className="w-24 h-24 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-8 text-primary shadow-inner">
-              <CheckCircle2 className="w-12 h-12" />
-            </div>
-            <DialogHeader>
-              <DialogTitle className="text-3xl font-black tracking-tight text-center">信息已就绪！</DialogTitle>
-              <DialogDescription className="text-lg leading-relaxed text-center pt-4">
-                现在我可以基于这些信息为你生成一份<strong className="text-foreground font-bold">个性化学习路线</strong>。是否立刻开启 AI 分析？
-              </DialogDescription>
-            </DialogHeader>
-            <div className="flex flex-col gap-4 max-w-sm mx-auto w-full mt-10">
-              <Button onClick={handleGenerateReport} className="h-14 rounded-xl font-bold text-lg shadow-xl shadow-primary/20">
-                生成 AI 学习报告 <Sparkles className="ml-2 w-5 h-5 text-yellow-400 fill-yellow-400" />
-              </Button>
-              <Button variant="secondary" onClick={handleSkipAI} className="h-14 rounded-xl font-bold text-lg">
-                跳过并进入系统
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {/* Step 4: AI Result (Onboarding Only) */}
-        {step === 4 && (
-          <div className="flex flex-col h-[90vh] max-h-[850px] p-10 animate-in slide-in-from-bottom duration-500">
+        {/* Step 3: AI Result (Onboarding Only) */}
+        {step === 3 && (
+          <div className="flex flex-col max-h-[90vh] p-6 sm:p-8 animate-in slide-in-from-bottom duration-500">
             {loading ? (
-              <div className="flex flex-col items-center justify-center flex-1">
-                <div className="relative mb-10">
+              <div className="flex flex-col items-center justify-center py-20">
+                <div className="relative mb-8">
                   <div className="absolute inset-0 bg-primary blur-3xl opacity-20 animate-pulse" />
                   <Loader2 className="w-16 h-16 text-primary animate-spin relative z-10" />
                 </div>
-                <h3 className="text-2xl font-black tracking-tight mb-2">正在同步智慧...</h3>
-                <p className="text-muted-foreground animate-pulse text-lg">AI 助手正在深度定制你的学习方案</p>
+                <h3 className="text-2xl font-black tracking-tight mb-2">正在分析你的特质...</h3>
+                <p className="text-muted-foreground animate-pulse text-lg">AI 助手正在为你匹配专属学习角色</p>
               </div>
             ) : (
-              <div className="flex flex-col h-full">
-                <DialogHeader className="mb-8">
+              <div className="flex flex-col w-full items-center justify-start pt-6 space-y-6">
+                <DialogHeader className="mb-2 shrink-0">
                   <DialogTitle className="text-3xl font-black text-center flex items-center justify-center gap-3 tracking-tight">
-                    <BrainCircuit className="w-10 h-10 text-primary" />
-                    你的专属 AI 导师报告
+                    <BrainCircuit className="w-8 h-8 text-primary" />
+                    你的专属角色
                   </DialogTitle>
                 </DialogHeader>
-                <Card className="flex-1 overflow-hidden border border-border/50 bg-background/50 shadow-sm rounded-xl">
-                  <CardContent className="h-full p-0">
-                    <ScrollArea className="h-full">
-                      <div className="p-8 prose prose-slate dark:prose-invert max-w-none text-foreground/90">
-                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                          {report}
-                        </ReactMarkdown>
-                      </div>
-                    </ScrollArea>
-                  </CardContent>
-                </Card>
-                <div className="flex justify-center mt-10">
-                  <Button onClick={onComplete} className="h-14 w-full max-w-sm rounded-xl font-black text-xl shadow-xl shadow-primary/20">
-                    开启学习之旅
-                  </Button>
+                
+                <ScrollArea className="w-full flex-1 max-w-3xl">
+                  <div className="w-full bg-primary/5 rounded-2xl p-6 sm:p-8 border border-primary/20 shadow-inner flex flex-col items-center text-center">
+                    <h2 className="text-3xl sm:text-4xl font-black tracking-tighter text-primary mb-6">{roleName}</h2>
+                    <div className="w-full prose prose-slate dark:prose-invert prose-p:leading-relaxed text-foreground/80 max-w-none text-left p-2 sm:p-4 text-base">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                        {report.replace(new RegExp(`【角色定位】[:：]\\s*${roleName}`), '')}
+                      </ReactMarkdown>
+                    </div>
+                  </div>
+                </ScrollArea>
+
+                <div className="flex justify-center shrink-0 w-full pt-2 gap-4">
+                  {mode === "settings" ? (
+                    <>
+                      <Button variant="outline" onClick={() => setStep(2)} className="h-14 w-full max-w-[200px] rounded-xl font-bold text-lg">
+                        重新定位
+                      </Button>
+                      <Button onClick={onClose} className="h-14 w-full max-w-[200px] rounded-xl font-black text-xl shadow-xl shadow-primary/20">
+                        确认
+                      </Button>
+                    </>
+                  ) : (
+                    <Button onClick={() => setStep(4)} className="h-14 w-full max-w-sm rounded-xl font-black text-xl shadow-xl shadow-primary/20">
+                      开启学习之旅 <Sparkles className="ml-2 w-5 h-5 text-yellow-400 fill-yellow-400" />
+                    </Button>
+                  )}
                 </div>
               </div>
             )}
           </div>
+        )}
+        {/* Step 4: Course Selection */}
+        {step === 4 && (
+          <CourseSelection onStart={(stageId) => {
+            console.log("Starting stage:", stageId);
+            onComplete();
+          }} />
         )}
       </DialogContent>
     </Dialog>
