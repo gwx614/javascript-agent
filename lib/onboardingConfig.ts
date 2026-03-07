@@ -1,12 +1,4 @@
-export type QuestionType = "select" | "checkbox" | "textarea";
-
-export interface Question {
-  id: number;
-  question: string;
-  type: QuestionType;
-  options: string[];
-  placeholder?: string;
-}
+import { Question } from "@/types";
 
 export const formQuestions: Question[] = [
   {
@@ -121,11 +113,11 @@ export const formQuestions: Question[] = [
 ];
 
 // Helper to generate the default empty state for the form
-export const generateDefaultFormData = (): Record<number, any> => {
-  const defaults: Record<number, any> = {};
+export const generateDefaultFormData = (): Record<string | number, any> => {
+  const defaults: Record<string | number, any> = {};
   formQuestions.forEach((q) => {
     if (q.type === "select") {
-      defaults[q.id] = q.options[0]; // Default to first option
+      defaults[q.id] = q.options ? q.options[0] : ""; // Default to first option or empty string
     } else if (q.type === "checkbox") {
       defaults[q.id] = [];           // Default empty array for multiple selection
     } else if (q.type === "textarea") {
@@ -135,5 +127,4 @@ export const generateDefaultFormData = (): Record<number, any> => {
   return defaults;
 };
 
-// Deprecated: We replace the old defaultFormData with the dynamic generator
 export const defaultFormData = generateDefaultFormData();

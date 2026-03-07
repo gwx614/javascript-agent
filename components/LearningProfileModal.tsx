@@ -4,8 +4,10 @@ import { useState, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Loader2, ArrowRight, CheckCircle2, Target, BrainCircuit, Clock, Layout, Code2, AlertCircle, Briefcase, Sparkles, Save } from "lucide-react";
-import { formQuestions, defaultFormData, Question } from "@/lib/onboardingConfig";
+import { formQuestions, defaultFormData } from "@/lib/onboardingConfig";
+import { Question } from "@/types";
 import { CourseSelection } from "./CourseSelection";
+import { useUserStore } from "@/store/useUserStore";
 
 // Shadcn UI Components
 import {
@@ -38,6 +40,10 @@ export function LearningProfileModal({ mode, onComplete, onClose }: LearningProf
   const [report, setReport] = useState("");
   const [roleName, setRoleName] = useState("");
   const [formData, setFormData] = useState(defaultFormData);
+  
+  const user = useUserStore(state => state.user);
+  const updateUser = useUserStore(state => state.updateUser);
+  const setOnboarded = useUserStore(state => state.setOnboarded);
 
   useEffect(() => {
     const saved = localStorage.getItem("learningProfile");
@@ -50,28 +56,22 @@ export function LearningProfileModal({ mode, onComplete, onClose }: LearningProf
     }
     
     // 如果是设置模式，尝试恢复已有的角色名称
-    if (mode === "settings") {
-      const userStr = localStorage.getItem("user");
-      if (userStr) {
-        try {
-          const user = JSON.parse(userStr);
-          if (user.rolePosition) {
-            setRoleName(user.rolePosition);
-            if (user.roleReport) {
-              setReport(user.roleReport);
-            } else {
-              setReport("这是你当前保存的专属角色！如果想改变学习侧重点，可以点击重新定位获取全新角色。");
-            }
-          }
-        } catch (e) {}
+    if (mode === "settings" && user) {
+      if (user.rolePosition) {
+        setRoleName(user.rolePosition);
+        if (user.roleReport) {
+          setReport(user.roleReport);
+        } else {
+          setReport("这是你当前保存的专属角色！如果想改变学习侧重点，可以点击重新定位获取全新角色。");
+        }
       }
     }
-  }, [mode]);
+  }, [mode, user]);
 
   const handleNext = () => setStep(step + 1);
 
   const handleSkipAI = () => {
-    localStorage.setItem("onboarded", "true");
+    setOnboarded(true);
     setStep(4);
   };
 
@@ -79,10 +79,8 @@ export function LearningProfileModal({ mode, onComplete, onClose }: LearningProf
     localStorage.setItem("learningProfile", JSON.stringify(formData));
     
     // Also try saving to DB if user is logged in
-    const userStr = localStorage.getItem("user");
-    if (userStr) {
+    if (user?.username) {
       try {
-        const user = JSON.parse(userStr);
         await fetch("/api/user/profile", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -91,6 +89,11 @@ export function LearningProfileModal({ mode, onComplete, onClose }: LearningProf
             rolePosition: roleName,
             formData
           })
+        });
+        
+        // Update user store
+        updateUser({
+          rolePosition: roleName
         });
       } catch (e) {
         console.error("Failed to save profile to DB", e);
@@ -105,18 +108,17 @@ export function LearningProfileModal({ mode, onComplete, onClose }: LearningProf
     setStep(3);
     
     localStorage.setItem("learningProfile", JSON.stringify(formData));
-    localStorage.setItem("onboarded", "true");
+    setOnboarded(true);
 
     try {
       const res = await fetch("/api/onboarding", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        // Construct detailed Q&A block instead of raw form dictionary
         body: JSON.stringify(
           formQuestions.map(q => ({
             id: q.id,
             question: q.question,
-            answer: (formData as any)[q.id]
+            answer: (formData as Record<string | number, unknown>)[q.id]
           }))
         )
       });
@@ -129,10 +131,8 @@ export function LearningProfileModal({ mode, onComplete, onClose }: LearningProf
         setRoleName(extractedRole);
 
         // Save to Database
-        const userStr = localStorage.getItem("user");
-        if (userStr) {
+        if (user?.username) {
           try {
-            const user = JSON.parse(userStr);
             const saveRes = await fetch("/api/user/profile", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -145,14 +145,11 @@ export function LearningProfileModal({ mode, onComplete, onClose }: LearningProf
             });
             const saveData = await saveRes.json();
             if (saveData.success) {
-               console.log("Profile saved to db:", saveData);
-               localStorage.setItem("user", JSON.stringify({ 
-                 ...user, 
+               // Update Zustand User Store
+               updateUser({ 
                  rolePosition: extractedRole,
                  roleReport: data.report 
-               }));
-               // trigger an event to layout/page to know user profile updated
-               window.dispatchEvent(new Event("userProfileUpdated"));
+               });
             }
           } catch (e) {
             console.error("Failed to save profile to DB", e);
@@ -193,7 +190,7 @@ export function LearningProfileModal({ mode, onComplete, onClose }: LearningProf
             <SelectValue placeholder="请选择..." />
           </SelectTrigger>
           <SelectContent className="rounded-lg border-none shadow-xl">
-            {field.options.map(opt => (
+            {(field.options || []).map(opt => (
               <SelectItem key={opt} value={opt} className="rounded-md cursor-pointer">
                 {opt}
               </SelectItem>
@@ -217,7 +214,7 @@ export function LearningProfileModal({ mode, onComplete, onClose }: LearningProf
     if (field.type === "checkbox") {
       return (
         <div className="flex flex-col gap-3 mt-2">
-          {field.options.map(opt => {
+          {(field.options || []).map(opt => {
             const isChecked = Array.isArray(value) && value.includes(opt);
             return (
               <label key={opt} className="flex items-center gap-3 p-3 rounded-lg bg-muted/20 hover:bg-muted/40 cursor-pointer transition-colors">
@@ -371,8 +368,7 @@ export function LearningProfileModal({ mode, onComplete, onClose }: LearningProf
         )}
         {/* Step 4: Course Selection */}
         {step === 4 && (
-          <CourseSelection onStart={(stageId) => {
-            console.log("Starting stage:", stageId);
+          <CourseSelection onStart={() => {
             onComplete();
           }} />
         )}

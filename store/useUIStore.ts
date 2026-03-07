@@ -1,0 +1,17 @@
+import { create } from 'zustand';
+
+export interface UIState {
+  isSidebarOpen: boolean;
+  setSidebarOpen: (isOpen: boolean) => void;
+  toggleSidebar: () => void;
+  currentStage: string;
+  setCurrentStage: (stage: string) => void;
+}
+
+export const useUIStore = create<UIState>((set) => ({
+  isSidebarOpen: true,
+  setSidebarOpen: (isOpen) => set({ isSidebarOpen: isOpen }),
+  toggleSidebar: () => set((state) => ({ isSidebarOpen: !state.isSidebarOpen })),
+  currentStage: "基础语法",
+  setCurrentStage: (stage) => set({ currentStage: stage }),
+}));

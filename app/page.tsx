@@ -4,17 +4,25 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
-import { MessageList } from "@/components/chat/MessageList";
-import { ChatInput } from "@/components/chat/ChatInput";
+import { cn } from "@/lib/utils";
+import { AiAssistant } from "@/components/chat";
 import { Loader2 } from "lucide-react";
 import { LearningProfileModal } from "@/components/LearningProfileModal";
+import { LearningSidebar } from "@/components/learning/LearningSidebar";
+import { LearningContent } from "@/components/learning/LearningContent";
+import { useUIStore } from "@/store/useUIStore";
+import { useUserStore } from "@/store/useUserStore";
 
 export default function ChatPage() {
   const router = useRouter();
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [username, setUsername] = useState("");
-  const [showOnboarding, setShowOnboarding] = useState(false);
-  const [user, setUser] = useState<any>(null);
+
+  const user = useUserStore(state => state.user);
+  const isAuthenticated = useUserStore(state => state.isAuthenticated);
+  const hasOnboarded = useUserStore(state => state.hasOnboarded);
+  const setOnboarded = useUserStore(state => state.setOnboarded);
+  const hasHydrated = useUserStore(state => state._hasHydrated);
+  
+  const isSidebarOpen = useUIStore(state => state.isSidebarOpen);
 
   const { messages, sendMessage, status, stop } = useChat({
     transport: new DefaultChatTransport({
@@ -27,46 +35,14 @@ export default function ChatPage() {
 
   // 验证登录状态
   useEffect(() => {
-    const userStr = localStorage.getItem("user");
-    if (!userStr) {
+    // 只有在 hydration 完成后才进行跳转判断
+    if (hasHydrated && !isAuthenticated) {
       router.replace("/login");
-    } else {
-      try {
-        const parsedUser = JSON.parse(userStr);
-        if (parsedUser && parsedUser.username) {
-          setUsername(parsedUser.username);
-          setUser(parsedUser);
-          setIsAuthenticated(true);
-          
-          // 如果用户已登录，每次刷新都展示学习问卷弹窗 (开发或特定需求)
-          setShowOnboarding(true);
-        } else {
-          router.replace("/login");
-        }
-      } catch (e) {
-        router.replace("/login");
-      }
     }
-  }, [router]);
-
-  // 监听角色定位更新事件
-  useEffect(() => {
-    const handleProfileUpdate = () => {
-      const userStr = localStorage.getItem("user");
-      if (userStr) {
-        try {
-          const parsedUser = JSON.parse(userStr);
-          setUser(parsedUser);
-        } catch (e) {}
-      }
-    };
-    window.addEventListener("userProfileUpdated", handleProfileUpdate);
-    return () => window.removeEventListener("userProfileUpdated", handleProfileUpdate);
-  }, []);
+  }, [hasHydrated, isAuthenticated, router]);
 
   const handleOnboardingComplete = () => {
-    localStorage.setItem("onboarded", "true");
-    setShowOnboarding(false);
+    setOnboarded(true);
   };
 
   // 是否正在加载（submitted 或 streaming 状态）
@@ -78,38 +54,44 @@ export default function ChatPage() {
     sendMessage({ text });
   };
 
-  // 如果还没验证通过，显示加载状态
-  // 这个设计可以防止用户在未登录时瞬间看到聊天界面结构导致抖动（Flash of Unauthenticated Content）
-  if (!isAuthenticated) {
+  // 如果还没加载完成或未鉴权，显示加载状态
+  if (!hasHydrated || !isAuthenticated) {
     return (
-      <div className="flex h-screen w-full items-center justify-center bg-background">
+      <div className="flex h-[calc(100vh-73px)] w-full items-center justify-center bg-background">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-73px)] max-w-3xl mx-auto w-full">
-      {showOnboarding && (
+    <div className="flex h-[calc(100vh-73px)] w-full overflow-hidden bg-background">
+      {!hasOnboarded && (
         <LearningProfileModal 
           mode="onboarding" 
           onComplete={handleOnboardingComplete} 
         />
       )}
 
-      {/* ========== 消息列表区域 ========== */}
-      <main className="flex-1 overflow-y-auto">
-        <MessageList messages={messages} isLoading={isThinking} />
-      </main>
-
-      {/* ========== 底部输入区域 ========== */}
-      <footer className="flex-shrink-0 border-t border-border bg-card/50 backdrop-blur-sm">
-        <ChatInput
-          isLoading={isBusy}
-          onSend={handleSend}
-          onStop={stop}
-        />
-      </footer>
+      {/* ========== 左侧：学习目录 ========== */}
+      <LearningSidebar />
+  
+      {/* ========== 中间：学习主体内容 ========== */}
+      <LearningContent />
+  
+      {/* ========== 右侧：AI 助教聊天 ========== */}
+      <AiAssistant
+        messages={messages}
+        isThinking={isThinking}
+        isBusy={isBusy}
+        onSend={handleSend}
+        onStop={stop}
+        className={cn(
+          "hidden lg:flex border-l border-border transition-[width,max-width] duration-300 ease-in-out shrink-0 overflow-hidden",
+          isSidebarOpen 
+            ? "w-[35%] max-w-[448px]" 
+            : "w-[45%] max-w-full"
+        )}
+      />
     </div>
   );
 }

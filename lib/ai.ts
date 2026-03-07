@@ -51,10 +51,6 @@ const customFetch = async (url: RequestInfo | URL, init?: RequestInit): Promise<
     }
   }
 
-  // 记录确切的 payload 和 headers
-  console.error("\n\n[customFetch] Requesting URL:", targetUrl);
-  console.error("[customFetch] Body:", init?.body);
-  
   return fetch(targetUrl, init);
 };
 

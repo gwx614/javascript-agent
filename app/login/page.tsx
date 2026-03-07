@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Bot, ArrowRight, User as UserIcon, Lock, Loader2 } from "lucide-react";
+import { useUserStore } from "@/store/useUserStore";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -11,13 +12,25 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  
+  const isAuthenticated = useUserStore(state => state.isAuthenticated);
+  const login = useUserStore(state => state.login);
+  const hasHydrated = useUserStore(state => state._hasHydrated);
 
   // 如果已经登录，直接跳回首页
   useEffect(() => {
-    if (localStorage.getItem("user")) {
+    if (hasHydrated && isAuthenticated) {
       router.replace("/");
     }
-  }, [router]);
+  }, [hasHydrated, isAuthenticated, router]);
+
+  if (!hasHydrated) {
+    return (
+      <div className="min-h-screen w-full flex items-center justify-center bg-background relative overflow-hidden">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+      </div>
+    );
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,8 +74,8 @@ export default function LoginPage() {
           return;
         }
 
-        // 成功登录，覆盖本地存储状态
-        localStorage.setItem("user", JSON.stringify(data.user));
+        // 成功登录，存入状态管理器
+        login(data.user);
       } else {
         // 请求注册 API
         const res = await fetch("/api/auth/register", {
@@ -79,8 +92,8 @@ export default function LoginPage() {
           return;
         }
 
-        // 成功注册，当作登录成功处理，覆盖本地存储状态
-        localStorage.setItem("user", JSON.stringify(data.user));
+        // 成功注册，当作登录成功处理，存入状态管理器
+        login(data.user);
       }
 
       // 跳转到首页

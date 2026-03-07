@@ -27,7 +27,6 @@
     "ai": "^6.0.101",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "eslint-config-next": "latest",
     "langchain": "^1.2.27",
     "lucide-react": "^0.575.0",
     "next": "latest",
@@ -36,7 +35,8 @@
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",
     "tailwind-merge": "^3.5.0",
-    "tailwindcss-animate": "^1.0.7"
+    "tailwindcss-animate": "^1.0.7",
+    "zustand": "^5.0.11"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

@@ -1,38 +1,42 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { Bot, LogOut, UserRoundPen, Sun, Moon, Check } from "lucide-react";
 import { useTheme } from "@/components/theme-provider";
 import { LearningProfileModal } from "@/components/LearningProfileModal";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useUIStore } from "@/store/useUIStore";
+import { useUserStore } from "@/store/useUserStore";
 
 export function GlobalHeader() {
   const router = useRouter();
   const pathname = usePathname();
   const { theme, toggleTheme } = useTheme();
-  const [username, setUsername] = useState("");
   const [showSettings, setShowSettings] = useState(false);
   const [isConfirmingLogout, setIsConfirmingLogout] = useState(false);
+  
+  const user = useUserStore(state => state.user);
+  const logout = useUserStore(state => state.logout);
 
-  useEffect(() => {
-    // Only fetch user on client-side
-    const checkUser = () => {
-      const userStr = localStorage.getItem("user");
-      if (userStr) {
-        try {
-          const parsedUser = JSON.parse(userStr);
-          if (parsedUser && parsedUser.username) {
-            setUsername(parsedUser.username);
-          }
-        } catch (e) {}
-      }
-    };
-    
-    checkUser();
-    
-    window.addEventListener("userProfileUpdated", checkUser);
-    return () => window.removeEventListener("userProfileUpdated", checkUser);
-  }, []);
+  const currentStage = useUIStore(state => state.currentStage);
+  const setCurrentStage = useUIStore(state => state.setCurrentStage);
+
+  const STAGES = [
+    "基础语法",
+    "对象、数组与内置对象",
+    "函数进阶与作用域",
+    "DOM 与 BOM 操作",
+    "异步编程",
+    "模块化与工程化基础",
+    "高级特性与性能优化"
+  ];
 
   const handleLogout = () => {
     if (!isConfirmingLogout) {
@@ -41,7 +45,7 @@ export function GlobalHeader() {
       setTimeout(() => setIsConfirmingLogout(false), 3000);
       return;
     }
-    localStorage.removeItem("user");
+    logout();
     router.replace("/login");
   };
 
@@ -60,7 +64,7 @@ export function GlobalHeader() {
         />
       )}
       <header className="flex-shrink-0 relative z-10 w-full border-b border-border bg-card/50 backdrop-blur-sm">
-        <div className="flex items-center justify-between px-6 py-4 w-full">
+        <div className="flex items-center justify-between px-6 py-3 w-full">
           {/* Left: Logo & Title */}
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-primary flex items-center justify-center shadow-md shadow-primary/20">
@@ -68,12 +72,28 @@ export function GlobalHeader() {
             </div>
             <div className="flex flex-col">
               <h1 className="text-sm font-bold text-foreground">JS 小智</h1>
-              {username && <p className="text-xs text-muted-foreground mr-1">@{username}</p>}
+              {user?.username && <p className="text-xs text-muted-foreground mr-1">@{user.username}</p>}
+            </div>
+
+            {/* Stage Switcher Dropdown */}
+            <div className="ml-2 hidden sm:block">
+              <Select value={currentStage} onValueChange={setCurrentStage}>
+                <SelectTrigger className="w-auto h-9 bg-transparent border-none shadow-none focus:ring-0 text-muted-foreground hover:text-foreground transition-colors font-bold gap-1.5 px-2 text-base">
+                  <SelectValue placeholder="切换阶段" />
+                </SelectTrigger>
+                <SelectContent className="min-w-[200px]">
+                  {STAGES.map((stage) => (
+                    <SelectItem key={stage} value={stage}>
+                      {stage}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
           {/* Right: Actions */}
-          <div className="flex items-center gap-1 sm:gap-2">
+          <div className="flex items-center gap-2 sm:gap-3">
             {/* Settings Button */}
           <button
             onClick={() => setShowSettings(true)}

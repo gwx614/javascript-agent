@@ -20,7 +20,6 @@ export async function POST(req: Request) {
     if (userHeader) {
       try {
         user = JSON.parse(decodeURIComponent(userHeader));
-        console.log("User data from header:", user);
       } catch (e) {
         console.error("Failed to parse user header", e);
       }
@@ -132,8 +131,7 @@ export async function POST(req: Request) {
                       });
                       controller.enqueue(encoder.encode(`data: ${uiMessage}\n\n`));
                     } catch (enqueueError) {
-                      if (enqueueError instanceof Error && enqueueError.message.includes('closed')) {
-                        console.log("Client disconnected, stopping stream");
+                      if (enqueueError instanceof Error && controller.desiredSize === null) {
                         return;
                       }
                       throw enqueueError;
