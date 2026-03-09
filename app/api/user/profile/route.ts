@@ -3,7 +3,7 @@ import { getPrisma } from "@/lib/prisma";
 
 export async function POST(req: Request) {
   try {
-    const { username, rolePosition, roleReport, formData } = await req.json();
+    const { username, rolePosition, roleReport, skillLevel, formData } = await req.json();
 
     if (!username) {
       return NextResponse.json({ error: "Missing username" }, { status: 400 });
@@ -11,12 +11,14 @@ export async function POST(req: Request) {
 
     const prisma = getPrisma();
 
+    const updateData: any = {};
+    if (rolePosition !== undefined) updateData.rolePosition = rolePosition;
+    if (roleReport !== undefined) updateData.roleReport = roleReport;
+    if (skillLevel !== undefined) updateData.skillLevel = skillLevel;
+
     const user = await prisma.user.update({
       where: { username },
-      data: {
-        rolePosition: rolePosition,
-        roleReport: roleReport,
-      },
+      data: updateData,
     });
 
     return NextResponse.json({ 
@@ -24,7 +26,8 @@ export async function POST(req: Request) {
       user: {
         username: user.username,
         rolePosition: user.rolePosition,
-        roleReport: user.roleReport
+        roleReport: user.roleReport,
+        skillLevel: user.skillLevel
       }
     });
 

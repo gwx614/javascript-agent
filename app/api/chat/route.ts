@@ -1,4 +1,4 @@
-import { JS_LEARNING_SYSTEM_PROMPT, DEFAULT_MODEL } from "@/lib/ai";
+import { JS_LEARNING_SYSTEM_PROMPT, DEFAULT_MODEL, getAIApiKey, AI_API_URL } from "@/lib/ai";
 
 /**
  * 流式对话 API 路由
@@ -47,9 +47,6 @@ export async function POST(req: Request) {
         };
       });
 
-    const apiKey = process.env.DASHSCOPE_API_KEY || process.env.OPENAI_API_KEY;
-    const url = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions";
-    
     // 注入角色的系统提示词
     const dynamicSystemPrompt = user?.rolePosition 
       ? `${JS_LEARNING_SYSTEM_PROMPT}\n\n当前用户的专属角色定位是：【${user.rolePosition}】。请你在接下来的所有回复中，严格保持这个角色定位对应的口吻、辅导方式和交流深度。`
@@ -66,11 +63,11 @@ export async function POST(req: Request) {
       stream: true
     };
 
-    const response = await fetch(url, {
+    const response = await fetch(AI_API_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${apiKey}`
+        "Authorization": `Bearer ${getAIApiKey()}`
       },
       body: JSON.stringify(requestBody)
     });

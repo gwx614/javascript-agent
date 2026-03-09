@@ -1,4 +1,4 @@
-import { DEFAULT_MODEL } from "@/lib/ai";
+import { callAI } from "@/lib/ai";
 
 export async function POST(req: Request) {
   try {
@@ -20,38 +20,17 @@ export async function POST(req: Request) {
     
     【角色定位】：[填写一个简短有力、响亮的角色名]
     
-    [正文：用一段100~200字左右的连贯文字，简单准确地结合问卷介绍他为什么属于这个定位（注意使用“你”来称呼用户）]`;
+    [正文：用一段100~200字左右的连贯文字，简单准确地结合问卷介绍他为什么属于这个定位（注意使用"你"来称呼用户）]`;
 
-    const apiKey = process.env.DASHSCOPE_API_KEY || process.env.OPENAI_API_KEY;
-    const url = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions";
-    
-    const requestBody = {
-      model: DEFAULT_MODEL || "glm-4-flash",
+    const reportText = await callAI({
       messages: [
         { role: "system", content: systemPrompt },
-        { role: "user", content: `这是用户的真实学习画像：\n${JSON.stringify(data, null, 2)}` }
+        { role: "user", content: `这是用户的真实学习画像：\n${JSON.stringify(data, null, 2)}` },
       ],
       temperature: 0.8,
-      max_tokens: 800
-    };
-
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${apiKey}`
-      },
-      body: JSON.stringify(requestBody)
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("[Onboarding API Error]:", errorText);
-      throw new Error(`AI API error: ${response.status}`);
-    }
-
-    const result = await response.json();
-    const reportText = result.choices?.[0]?.message?.content || "无法生成报告，可能未获取到有效内容。";
+      maxTokens: 800,
+      label: "Onboarding",
+    }) || "无法生成报告，可能未获取到有效内容。";
 
     return Response.json({ report: reportText });
 

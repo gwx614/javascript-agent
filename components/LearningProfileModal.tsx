@@ -26,7 +26,6 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Card, CardContent } from "@/components/ui/card";
 
 interface LearningProfileModalProps {
   mode: "onboarding" | "settings";
@@ -108,7 +107,6 @@ export function LearningProfileModal({ mode, onComplete, onClose }: LearningProf
     setStep(3);
     
     localStorage.setItem("learningProfile", JSON.stringify(formData));
-    setOnboarded(true);
 
     try {
       const res = await fetch("/api/onboarding", {
@@ -133,6 +131,15 @@ export function LearningProfileModal({ mode, onComplete, onClose }: LearningProf
         // Save to Database
         if (user?.username) {
           try {
+            // 从第一题的答案映射 skillLevel
+            const levelAnswer = String((formData as any)[1] || "");
+            let skillLevel = "beginner";
+            if (levelAnswer.startsWith("有一定基础")) {
+              skillLevel = "intermediate";
+            } else if (levelAnswer.startsWith("基础较好")) {
+              skillLevel = "advanced";
+            }
+
             const saveRes = await fetch("/api/user/profile", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -140,6 +147,7 @@ export function LearningProfileModal({ mode, onComplete, onClose }: LearningProf
                 username: user.username,
                 rolePosition: extractedRole,
                 roleReport: data.report,
+                skillLevel,
                 formData
               })
             });
@@ -148,7 +156,8 @@ export function LearningProfileModal({ mode, onComplete, onClose }: LearningProf
                // Update Zustand User Store
                updateUser({ 
                  rolePosition: extractedRole,
-                 roleReport: data.report 
+                 roleReport: data.report,
+                 skillLevel
                });
             }
           } catch (e) {
@@ -368,8 +377,9 @@ export function LearningProfileModal({ mode, onComplete, onClose }: LearningProf
         )}
         {/* Step 4: Course Selection */}
         {step === 4 && (
-          <CourseSelection onStart={() => {
-            onComplete();
+          <CourseSelection onStart={(stageId) => {
+             useUserStore.getState().setSelectedCourseId(stageId);
+             onComplete();
           }} />
         )}
       </DialogContent>

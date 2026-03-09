@@ -3,14 +3,12 @@ import { Question } from "@/types";
 export const formQuestions: Question[] = [
   {
     id: 1,
-    question: "请评估您当前的编程基础与 JavaScript 掌握程度：",
+    question: "请选择最符合你当前情况的技术水平：",
     type: "select",
     options: [
-      "零基础初学者：无编程经验，计算机基础较弱",
-      "入门级：了解 HTML/CSS，能编写简单的脚本逻辑",
-      "有其他语言背景：熟练掌握 Python/Java/C++ 等，但未深入前端",
-      "前端从业者/进阶：已有 JS 开发经验，旨在突破技术瓶颈（如 ES6+、底层原理）",
-      "全栈转型：具备前端基础，计划深入 Node.js 后端开发"
+      "小白从零开始：无编程经验或刚开始接触",
+      "有一定基础：了解基本语法，能编写简单程序",
+      "基础较好：有实际开发经验，希望深入进阶"
     ],
     placeholder: ""
   },
