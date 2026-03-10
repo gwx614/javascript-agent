@@ -122,6 +122,7 @@ export async function callAI(options: {
   maxTokens?: number;
   jsonMode?: boolean;
   label?: string;
+  timeout?: number; // 超时时间（毫秒）
 }): Promise<string> {
   const {
     messages,
@@ -129,6 +130,7 @@ export async function callAI(options: {
     maxTokens = 2000,
     jsonMode = false,
     label = "AI",
+    timeout = 55000, // 默认 55 秒超时
   } = options;
 
   const apiKey = getAIApiKey();
@@ -144,23 +146,38 @@ export async function callAI(options: {
     requestBody.response_format = { type: "json_object" };
   }
 
-  const response = await fetch(AI_API_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify(requestBody),
-  });
+  // 创建 AbortController 用于超时控制
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeout);
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error(`[${label} API Error]:`, errorText);
-    throw new Error(`AI API error: ${response.status}`);
+  try {
+    const response = await fetch(AI_API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify(requestBody),
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[${label} API Error]:`, errorText);
+      throw new Error(`AI API error: ${response.status}`);
+    }
+
+    const result = await response.json();
+    return result.choices?.[0]?.message?.content || "";
+  } catch (error: any) {
+    clearTimeout(timeoutId);
+    if (error.name === 'AbortError') {
+      throw new Error(`AI 请求超时（${timeout}ms），请稍后重试`);
+    }
+    throw error;
   }
-
-  const result = await response.json();
-  return result.choices?.[0]?.message?.content || "";
 }
 /**
  * 通用 AI 流式调用函数

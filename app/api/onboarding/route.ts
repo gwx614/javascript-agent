@@ -8,6 +8,7 @@ export async function POST(req: Request) {
     const promptContext = data
       .map((item: any) => `问题${item.id}: ${item.question}\n回答: ${Array.isArray(item.answer) ? item.answer.join("、") : item.answer}`)
       .join("\n\n");
+    console.log(promptContext)
 
     const systemPrompt = `你是一个资深的 JavaScript 导师。
     根据用户提交的详细学习情况调研问卷，请直接为该用户生成一个准确的【专属角色定位】。

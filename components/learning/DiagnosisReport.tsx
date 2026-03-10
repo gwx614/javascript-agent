@@ -111,9 +111,9 @@ interface DiagnosisReportProps {
 }
 
 export function DiagnosisReport({ report, questions = [], onStartLearning }: DiagnosisReportProps) {
-  const { overallLevel, summary, questionAnalysis, knowledgePoints, learningPath, roleAdvice } = report;
-  const correctCount = (questionAnalysis || []).filter((qa) => qa.isCorrect).length;
-  const totalCount = (questionAnalysis || []).length;
+  const { overallLevel = "未知", summary = "", questionAnalysis = [], knowledgePoints = [], learningPath = [], roleAdvice = "" } = report;
+  const correctCount = questionAnalysis.filter((qa) => qa.isCorrect).length;
+  const totalCount = questionAnalysis.length;
 
   return (
     <div className="flex-1 w-full h-full bg-muted/10">
@@ -266,8 +266,8 @@ export function DiagnosisReport({ report, questions = [], onStartLearning }: Dia
                 推荐学习路径
               </h3>
               <div className="flex flex-wrap gap-2 items-center">
-                {learningPath.map((item: string, i: number) => {
-                  const kp = knowledgePoints.find((k) => k.name === item);
+                {(learningPath || []).map((item: string, i: number) => {
+                  const kp = (knowledgePoints || []).find((k) => k.name === item);
                   const isSkip = kp?.action === "skip";
                   return (
                     <div key={i} className="flex items-center gap-2">
@@ -306,13 +306,17 @@ export function DiagnosisReport({ report, questions = [], onStartLearning }: Dia
         </ScrollArea>
 
         {/* ========== 底部按钮 ========== */}
-        <div className="px-6 py-3 border-t bg-muted/5 shrink-0 flex items-center justify-between">
+        <div className="px-6 py-4 border-t bg-card shrink-0 flex items-center justify-between relative z-10 shadow-[0_-4px_12px_rgba(0,0,0,0.03)]">
           <p className="text-xs text-muted-foreground">
             以上内容由 AI 根据你的答题情况智能生成
           </p>
           <Button
-            onClick={onStartLearning}
-            className="px-8 h-10 rounded-xl font-bold shadow-md shadow-primary/20"
+            onClick={() => {
+              console.log("Start Learning clicked");
+              onStartLearning();
+            }}
+            size="lg"
+            className="px-10 h-11 rounded-xl font-bold shadow-lg shadow-primary/25 hover:scale-[1.02] active:scale-[0.98] transition-all"
           >
             开始学习 <ArrowRight className="w-4 h-4 ml-2" />
           </Button>

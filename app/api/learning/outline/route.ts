@@ -19,6 +19,39 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "用户不存在" }, { status: 400 });
     }
 
+    // 1. 尝试查找已有的阶段记录
+    let stage = await prisma.courseStage.findUnique({
+      where: {
+        userId_courseId: {
+          userId: user.id,
+          courseId: selectedCourseId as string,
+        }
+      }
+    });
+
+    // 如果没有记录，创建一个新的阶段记录
+    if (!stage) {
+      stage = await prisma.courseStage.create({
+        data: {
+          userId: user.id,
+          courseId: selectedCourseId as string,
+          status: "PRE_ASSESSMENT"
+        }
+      });
+    }
+
+    // 2. 验证状态是否允许生成大纲
+    // 允许的状态：PRE_ASSESSMENT(新阶段初始状态), PRE_REPORT(已完成摸底), STUDY_OUTLINE, STUDYING
+    if (stage.status !== "PRE_ASSESSMENT" && stage.status !== "PRE_REPORT" && stage.status !== "STUDY_OUTLINE" && stage.status !== "STUDYING") {
+      return NextResponse.json({ 
+        error: "状态不允许生成大纲",
+        currentStatus: stage.status,
+        validStatuses: ["PRE_ASSESSMENT", "PRE_REPORT", "STUDY_OUTLINE", "STUDYING"]
+      }, { status: 400 });
+    }
+
+    // 3. 强制重新生成大纲（移除已有的缓存判断，确保每次都能根据最新诊断生成）
+
     const selectedStage = STAGES.find((s) => s.id === selectedCourseId);
     const courseTitle = selectedStage?.title || "未知阶段";
     const courseObjective = selectedStage?.learningObjective || "";
@@ -91,15 +124,27 @@ ${diagRef}
       jsonMode: true,
       label: "Outline",
     });
-    console.log(systemPrompt)
+
     content = content.replace(/```json/g, "").replace(/```/g, "").trim();
-    console.log(content)
 
     try {
       const parsed = JSON.parse(content);
       const finalArray = Array.isArray(parsed)
         ? parsed
         : Object.values(parsed).find(Array.isArray) || [];
+
+      // 3. 将新生成的大纲保存到数据库，并更新状态
+      const outlineStr = JSON.stringify(finalArray);
+      if (stage) {
+        await prisma.courseStage.update({
+          where: { id: stage.id },
+          data: { 
+            learningOutline: outlineStr,
+            status: "STUDYING"
+          }
+        });
+      }
+
       return NextResponse.json({ sections: finalArray });
     } catch {
       console.error("Failed to parse outline JSON", content);

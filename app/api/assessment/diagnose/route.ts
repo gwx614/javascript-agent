@@ -23,13 +23,31 @@ export async function POST(req: Request) {
       );
     }
 
+    // 1. 尝试查找已有的阶段记录
+    let stage = await prisma.courseStage.findUnique({
+      where: {
+        userId_courseId: {
+          userId: user.id,
+          courseId: selectedCourseId as string,
+        }
+      }
+    });
+
+    // 2. 如果已有报告，直接返回
+    if (stage?.preReport) {
+      try {
+        return NextResponse.json({ report: JSON.parse(stage.preReport) });
+      } catch (e) {
+        console.error("Failed to parse stored preReport", e);
+      }
+    }
+
     // 获取选中课程的核心知识点
     const selectedStage = STAGES.find((s) => s.id === selectedCourseId);
     const coreKnowledge = selectedStage?.coreKnowledge || [];
     const courseTitle = selectedStage?.title || "未知阶段";
-    const courseObjective = selectedStage?.learningObjective || "";
 
-    // 将题目和用户答案组装为文本（包含选项，供 AI 判断正确答案）
+    // 将题目和用户答案组装为文本 (qaText logic remains same)
     const qaText = (questions || [])
       .map((q: any, i: number) => {
         const userAnswer = answers?.[q.id];
@@ -48,66 +66,51 @@ export async function POST(req: Request) {
       .join("\n\n");
 
     const systemPrompt = `你是一位资深的 JavaScript 学习诊断专家。
+你的任务是根据用户对【${courseTitle}】课程摸底题的回答情况，生成一份**课后学习诊断报告**。
 
-## 你的任务
-根据用户的答题情况，对该阶段的**每个核心知识点**进行**宏观能力诊断**。
+## 诊断依据
+- **用户角色**: ${user.roleReport || "未知"}
+- **技术水平**: ${user.skillLevel || "beginner"}
+- **学习目标**: ${ selectedStage ? `目前用户即将学习的内容是【${selectedStage.title}】。此阶段的目标是：“${selectedStage.learningObjective}”。\n此阶段的核心知识点包含：${selectedStage.coreKnowledge.join("、")}。` : `（当前未获取到明确的阶段课程）` }
+- **摸底表现**: ${qaText}
 
-## 核心分析方法论："由小见大"
-你收到的是具体的摸底题目和用户的选择。你不应该简单地判断"这道题答对了/答错了"，而应该：
-- **从一道题的选项推断用户在整个知识领域的理解深度**
-  例如：用户在关于 \`===\` 和 \`==\` 的题目中选错了 → 不仅说明"不懂严格等于"，更说明用户**对 JavaScript 类型系统和隐式转换缺乏整体理解**
-- **从多道题的综合表现推断用户的思维模式**
-  例如：用户在流程控制和函数定义的题目中都倾向于选择最简单的写法 → 说明用户**可能停留在语法记忆层面，缺乏灵活运用的能力**
-- **每个核心知识点的评估应覆盖其完整能力范围**，而不局限于某道具体题目的狭窄考点
+## 诊断要求
+1. **定量分析**: 为每个核心知识点 (${coreKnowledge.join("、")}) 给出 0-100 的掌握度评分。
+2. **定性建议**: 针对每个知识点，给出一个具体的【教学动作建议】（例如：跳过、重点强化、从零讲解）。
+3. **整体画像**: 针对用户的职业角色，给出一个简短的画像建议。
 
-## 用户信息
-- 角色定位: ${user.rolePosition}
-- 画像报告: ${user.roleReport || "无"}
-- 当前技术水平: ${user.skillLevel || "beginner"}
-
-## 课程信息
-- 阶段名称: 【${courseTitle}】
-- 学习目标: ${courseObjective}
-- 核心知识点: ${coreKnowledge.join("、")}
-
-## 用户的摸底答题情况
-${qaText}
-
-## 输出要求
-严格遵守且仅输出以下 JSON 结构（不要输出任何其他文字）：
-
+## 输出格式
+严格遵守以下 JSON 结构输出：
 {
-  "overallLevel": "对用户在【${courseTitle}】阶段的整体基础水平做一句话评级（如'有一定基础但不扎实'）",
-  "summary": "综合所有题目的表现，总结用户的核心优势和主要薄弱方向（50字以内，不要逐题罗列）",
+  "overallLevel": "初级/中级/高级",
+  "summary": "一份 100 字以内的综合诊断结论",
   "questionAnalysis": [
     {
       "questionIndex": 1,
       "isCorrect": true,
-      "correctAnswer": "正确答案的完整文本（从选项中选取）",
-      "explanation": "答对时：简要确认为什么对（30字以内）。答错时：解释用户为什么会选错，正确答案是什么以及为什么（50-80字）"
+      "userAnswer": "A",
+      "correctAnswer": "A",
+      "explanation": "简短解析"
     }
   ],
   "knowledgePoints": [
     {
-      "name": "核心知识点名称（必须来自: ${coreKnowledge.join("、")}）",
-      "mastery": "high 或 medium 或 low",
-      "action": "skip 或 reinforce 或 learn",
-      "note": "给用户看的简短提示（20字以内），如'面试高频考点' 或 '建议实战巩固'",
-      "teachingAdvice": "给后续 AI 教学系统用的详细教学建议（50-100字），包含：1）用户在该知识点上的具体薄弱表现；2）建议的教学切入角度和重点；3）需要特别强调或对比讲解的概念。例如：'用户混淆了 map 和 filter 的返回值，教程应从回调函数概念入手，用对比表格区分 map/filter/reduce 三者的输入输出，重点演示链式调用'"
+      "name": "知识点名称",
+      "mastery": "high/medium/low",
+      "score": 85,
+      "action": "skip/reinforce/learn",
+      "teachingAdvice": "给后续 AI 教程生成的具体指导意见，十分关键！！！"
     }
   ],
-  "learningPath": ["推荐的学习顺序，按知识点名称排列，需要从头学的排最前，已掌握的排最后"],
-  "roleAdvice": "根据用户角色和答题表现，给出的综合学习策略建议（100字以内，不要泛泛而谈，要具体可执行）"
+  "learningPath": ["知识点A", "知识点B", "知识点C"],
+  "roleAdvice": "针对该职业角色的学习侧重点建议"
 }
 
-## 关键约束
-1. questionAnalysis **必须包含每一道题目的分析**，数量与题目数量一致，questionIndex 从 1 开始递增
-2. knowledgePoints **必须覆盖该阶段全部核心知识点**（${coreKnowledge.join("、")}），即使某些知识点没有直接对应的题目，也要根据相关题目的表现进行合理推断
-3. mastery 仅允许 "high"、"medium"、"low"
-4. action 仅允许 "skip"（high 对应）、"reinforce"（medium 对应）、"learn"（low 对应）
-5. note 字段是给用户看的简短标签，不超过20字
-6. teachingAdvice 字段是给后续教程生成 AI 看的，要具体、有针对性、可操作，50-100字
-7. learningPath 中 action 为 "learn" 的知识点排最前，"reinforce" 次之，"skip" 排最后`;
+1. **questionAnalysis** 必须包含摸底题中所有题目的对错分析。
+2. **learningPath** 是一个字符串数组，包含 ${coreKnowledge.join("、")} 中的所有知识点，顺序应符合教学逻辑。
+3. **overallLevel** 给出用户在该阶段的整体定级。
+
+仅输出 JSON 字符串，不要带任何 Markdown 标记，不要包含任何其他解释性文字。`;
 
     let content = await callAI({
       messages: [
@@ -120,11 +123,23 @@ ${qaText}
       label: "Diagnose",
     });
 
-    // 清洗
     content = content.replace(/```json/g, "").replace(/```/g, "").trim();
 
     try {
       const parsed = JSON.parse(content);
+      
+      // 3. 将新生成的报告保存到数据库，并更新状态
+      const preReportStr = JSON.stringify(parsed);
+      if (stage) {
+        await prisma.courseStage.update({
+          where: { id: stage.id },
+          data: { 
+            preReport: preReportStr,
+            status: "PRE_REPORT"
+          }
+        });
+      }
+
       return NextResponse.json({ report: parsed });
     } catch (parseError) {
       console.error("Failed to parse diagnose response as JSON", content);

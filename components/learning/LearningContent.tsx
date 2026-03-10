@@ -5,17 +5,23 @@ import { PanelLeftOpen, Loader2, BookText } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useUIStore } from "@/store/useUIStore";
 import { useLearningStore } from "@/store/useLearningStore";
+import { useUserStore } from "@/store/useUserStore";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
 export function LearningContent() {
   const isSidebarOpen = useUIStore((state) => state.isSidebarOpen);
   const setSidebarOpen = useUIStore((state) => state.setSidebarOpen);
+  const selectedCourseId = useUserStore((state) => state.selectedCourseId);
 
-  const sections = useLearningStore((state) => state.sections);
-  const activeSectionId = useLearningStore((state) => state.activeSectionId);
-  const sectionContents = useLearningStore((state) => state.sectionContents);
-  const loadingContent = useLearningStore((state) => state.loadingContent);
+  // 直接访问store中的状态，避免使用getStageState导致的引用问题
+  const stageStates = useLearningStore((state) => state.stageStates);
+  const currentStageState = selectedCourseId ? stageStates[selectedCourseId] : null;
+  
+  const sections = currentStageState?.sections || [];
+  const activeSectionId = currentStageState?.activeSectionId || null;
+  const sectionContents = currentStageState?.sectionContents || {};
+  const loadingContent = currentStageState?.loadingContent || false;
 
   const activeSection = sections.find((s) => s.id === activeSectionId);
   const markdownContent = activeSectionId

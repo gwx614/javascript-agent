@@ -28,13 +28,16 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface LearningProfileModalProps {
-  mode: "onboarding" | "settings";
+  mode: "onboarding" | "settings" | "course-selection";
   onComplete: () => void;
   onClose?: () => void;
 }
 
 export function LearningProfileModal({ mode, onComplete, onClose }: LearningProfileModalProps) {
-  const [step, setStep] = useState(mode === "onboarding" ? 1 : 3);
+  const [step, setStep] = useState(
+    mode === "onboarding" ? 1 : 
+    mode === "course-selection" ? 4 : 3
+  );
   const [loading, setLoading] = useState(false);
   const [report, setReport] = useState("");
   const [roleName, setRoleName] = useState("");
@@ -252,7 +255,7 @@ export function LearningProfileModal({ mode, onComplete, onClose }: LearningProf
   return (
     <Dialog open={true} onOpenChange={(open) => { if(!open && onClose) onClose(); }}>
       <DialogContent 
-        hideClose={mode === "onboarding"}
+        hideClose={mode === "onboarding" || mode === "course-selection"}
         className="max-w-4xl p-0 overflow-hidden sm:rounded-2xl border-none shadow-2xl"
       >
         

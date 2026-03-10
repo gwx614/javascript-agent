@@ -10,9 +10,8 @@ generator client {
 
 datasource db {
   provider = "sqlite"
-  url      = "file:D:/work/JavascriptAgent/dev.db"
+  url      = env("DATABASE_URL")
 }
-
 
 // ============================================================
 // 用户模型
@@ -42,8 +41,56 @@ model User {
 
   // 关联
   chatSessions ChatSession[]
+  courseStages CourseStage[]
 
   @@map("users")
+}
+
+// ============================================================
+// 课程阶段模型
+// 记录用户在每个课程阶段的详细状态和生成的 AI 数据
+// ============================================================
+model CourseStage {
+  id              String   @id @default(cuid())
+  userId          String   @map("user_id")
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  courseId        String   @map("course_id") // 对应 STAGES 中的 id
+
+  // 学习阶段状态机
+  // 阶段枚举：PRE_ASSESSMENT | PRE_REPORT | STUDY_OUTLINE | STUDYING | POST_ASSESSMENT | POST_REPORT | COMPLETED
+  status          String   @default("PRE_ASSESSMENT")
+
+  // 持久化的 AI 生成数据 (存储为 JSON 字符串)
+  preQuestions    String?  @map("pre_questions") // 课前问卷
+  preReport       String?  @map("pre_report")    // 问卷报告
+  learningOutline String?  @map("learning_outline") // 学习大纲 (sections)
+  postQuestions   String?  @map("post_questions") // 课后问卷
+  postReport      String?  @map("post_report")    // 课后报告
+
+  // 关联的各章节教程内容
+  sectionContents SectionContent[]
+
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@unique([userId, courseId])
+  @@map("course_stages")
+}
+
+// ============================================================
+// 章节内容模型
+// 存储具体章节的 AI 生成教程内容
+// ============================================================
+model SectionContent {
+  id        String   @id @default(cuid())
+  stageId   String   @map("stage_id")
+  stage     CourseStage @relation(fields: [stageId], references: [id], onDelete: Cascade)
+  sectionId String   @map("section_id") // 对应大纲中的 section.id
+  content   String   // Markdown 内容
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([stageId, sectionId])
+  @@map("section_contents")
 }
 
 // ============================================================

@@ -14,6 +14,8 @@ import {
 } from "@/components/ui/select";
 import { useUIStore } from "@/store/useUIStore";
 import { useUserStore } from "@/store/useUserStore";
+import { useLearningStore } from "@/store/useLearningStore";
+import { STAGES } from "@/lib/courseConfig";
 
 export function GlobalHeader() {
   const router = useRouter();
@@ -24,19 +26,47 @@ export function GlobalHeader() {
   
   const user = useUserStore(state => state.user);
   const logout = useUserStore(state => state.logout);
+  const setSelectedCourseId = useUserStore(state => state.setSelectedCourseId);
 
   const currentStage = useUIStore(state => state.currentStage);
   const setCurrentStage = useUIStore(state => state.setCurrentStage);
 
-  const STAGES = [
-    "基础语法",
-    "对象、数组与内置对象",
-    "函数进阶与作用域",
-    "DOM 与 BOM 操作",
-    "异步编程",
-    "模块化与工程化基础",
-    "高级特性与性能优化"
-  ];
+  const handleStageChange = async (stageTitle: string) => {
+    setCurrentStage(stageTitle);
+    
+    // 找到对应的stage id
+    const stage = STAGES.find(s => s.title === stageTitle);
+    if (stage) {
+      setSelectedCourseId(stage.id);
+      
+      // 设置当前阶段ID
+      useLearningStore.getState().setCurrentStageId(stage.id);
+      
+      // 重新加载学习大纲
+      if (user?.username) {
+        useLearningStore.getState().setLoadingOutline(stage.id, true);
+        try {
+          const res = await fetch("/api/learning/outline", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              username: user.username,
+              selectedCourseId: stage.id,
+              diagnosisReport: useUserStore.getState().diagnosisReport,
+            }),
+          });
+          const data = await res.json();
+          if (data.sections) {
+            useLearningStore.getState().setSections(stage.id, data.sections);
+          }
+        } catch (err) {
+          console.error("Failed to load outline", err);
+        } finally {
+          useLearningStore.getState().setLoadingOutline(stage.id, false);
+        }
+      }
+    }
+  };
 
   const handleLogout = () => {
     if (!isConfirmingLogout) {
@@ -77,14 +107,14 @@ export function GlobalHeader() {
 
             {/* Stage Switcher Dropdown */}
             <div className="ml-2 hidden sm:block">
-              <Select value={currentStage} onValueChange={setCurrentStage}>
+              <Select value={currentStage} onValueChange={handleStageChange}>
                 <SelectTrigger className="w-auto h-9 bg-transparent border-none shadow-none focus:ring-0 text-muted-foreground hover:text-foreground transition-colors font-bold gap-1.5 px-2 text-base">
                   <SelectValue placeholder="切换阶段" />
                 </SelectTrigger>
                 <SelectContent className="min-w-[200px]">
                   {STAGES.map((stage) => (
-                    <SelectItem key={stage} value={stage}>
-                      {stage}
+                    <SelectItem key={stage.title} value={stage.title}>
+                      {stage.title}
                     </SelectItem>
                   ))}
                 </SelectContent>

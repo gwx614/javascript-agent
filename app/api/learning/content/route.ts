@@ -17,7 +17,7 @@ export async function POST(req: Request) {
       diagnosisReport,
     } = data;
 
-    if (!username || !sectionTitle) {
+    if (!username || !sectionTitle || !selectedCourseId) {
       return NextResponse.json({ error: "缺少必要参数" }, { status: 400 });
     }
 
@@ -26,10 +26,69 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "用户不存在" }, { status: 400 });
     }
 
+    // 1. 获取阶段 ID
+    let stage = await prisma.courseStage.findUnique({
+      where: {
+        userId_courseId: {
+          userId: user.id,
+          courseId: selectedCourseId as string,
+        }
+      }
+    });
+
+    if (!stage) {
+       return NextResponse.json({ error: "请先生成大纲" }, { status: 400 });
+    }
+
+    // 2. 验证状态是否允许生成教程内容
+    if (stage.status !== "STUDYING") {
+      return NextResponse.json({ 
+        error: "状态不允许生成教程内容",
+        currentStatus: stage.status,
+        validStatus: "STUDYING"
+      }, { status: 400 });
+    }
+
+    // 3. 验证是否已生成大纲
+    if (!stage.learningOutline) {
+      return NextResponse.json({ error: "请先生成大纲" }, { status: 400 });
+    }
+
+    // 2. 检查此小节是否已生成过内容
+    const { sectionId } = data; // 从前端获取具体的 ID (例如 section_1)
+    
+    if (!sectionId) {
+      return NextResponse.json({ error: "缺少 sectionId" }, { status: 400 });
+    }
+
+    const existingContent = await prisma.sectionContent.findUnique({
+      where: {
+        stageId_sectionId: {
+          stageId: stage.id,
+          sectionId: sectionId
+        }
+      }
+    });
+
+    if (existingContent) {
+      // 如果已有，直接用简单的流或者是普通响应返回（前端统一处理流式响应）
+      const encoder = new TextEncoder();
+      const customStream = new ReadableStream({
+        start(controller) {
+          controller.enqueue(encoder.encode(existingContent.content));
+          controller.close();
+        },
+      });
+      return new Response(customStream, {
+        headers: {
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache",
+        },
+      });
+    }
+
     const selectedStage = STAGES.find((s) => s.id === selectedCourseId);
     const courseTitle = selectedStage?.title || "未知阶段";
-
-    const rolePosition = user.rolePosition || "学习者";
     const skillLevel = user.skillLevel || "beginner";
 
     // 根据状态调整教学深度
@@ -66,7 +125,7 @@ export async function POST(req: Request) {
     const systemPrompt = `你是一位资深的 JavaScript 教学导师，正在为用户编写【${courseTitle}】课程中【${sectionTitle}】这一小节的详细学习教程。
 
 用户信息:
-- 角色定位: ${rolePosition}
+- 角色定位: ${user.roleReport || "未知"}
 - 技术水平: ${skillLevel}
 
 小节信息:
@@ -83,12 +142,7 @@ ${diagnosisContext}
 2. **代码丰富**：关键概念都配有 \`\`\`javascript 代码块示例，代码中包含详细中文注释
 3. **循序渐进**：从概念到实践逐步深入
 4. **实用建议**：在文末提供 💡 实用提示（常见错误、最佳实践等）
-5. **推荐资源**：在文末推荐 2-3 个对该知识点最有帮助的学习资源链接，可以包括：
-   - MDN Web Docs (https://developer.mozilla.org/)
-   - JavaScript.info (https://javascript.info/)
-   - 阮一峰 ES6 教程 (https://es6.ruanyifeng.com/)
-   - W3Schools (https://www.w3schools.com/)
-   - 掘金、知乎等中文社区的高质量博文
+5. **推荐资源**：在文末推荐 2-3 个对该知识点最有帮助的学习资源链接
 6. **篇幅控制**：保持内容充实但不冗长，约 1200-2000 字
 
 直接输出 Markdown 文本即可，不要包裹在 JSON 或代码块中。`;
@@ -103,7 +157,57 @@ ${diagnosisContext}
       label: "Content Stream",
     });
 
-    return new Response(stream, {
+    // 3. 为了持久化，我们需要拦截并保存流内容
+    // 这里使用一个简单的 TransformStream 来捕获累积的内容
+    let fullContent = "";
+    const transformStream = new TransformStream({
+      transform(chunk, controller) {
+        const text = new TextDecoder().decode(chunk);
+        // 解析 SSE 格式数据，提取真正的文本内容进行持久化
+        const lines = text.split("\n");
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (trimmed.startsWith("data: ")) {
+            const dataStr = trimmed.slice(6);
+            try {
+              const data = JSON.parse(dataStr);
+              if (data.type === "text-delta" && data.delta) {
+                fullContent += data.delta;
+              }
+            } catch (e) {
+              // 处理非 JSON 的情况，防止保存失败
+              if (dataStr !== "[DONE]") {
+                fullContent += dataStr;
+              }
+            }
+          }
+        }
+        controller.enqueue(chunk);
+      },
+      async flush() {
+        // 流结束后保存到数据库
+        try {
+          await prisma.sectionContent.upsert({
+            where: {
+              stageId_sectionId: {
+                stageId: stage!.id,
+                sectionId: sectionId
+              }
+            },
+            update: { content: fullContent },
+            create: {
+              stageId: stage!.id,
+              sectionId: sectionId,
+              content: fullContent
+            }
+          });
+        } catch (e) {
+          console.error("Failed to save stream content to DB", e);
+        }
+      }
+    });
+
+    return new Response(stream.pipeThrough(transformStream), {
       headers: {
         "Content-Type": "text/event-stream",
         "Cache-Control": "no-cache",

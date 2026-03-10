@@ -5,12 +5,14 @@ import {
   BookOpen,
   PanelLeftClose,
   Loader2,
+  CheckCircle2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useUIStore } from "@/store/useUIStore";
 import { useLearningStore } from "@/store/useLearningStore";
 import { useUserStore } from "@/store/useUserStore";
+import { useState } from "react";
 
 function getStatusIcon(status: string, isActive: boolean) {
   // 活跃状态显示一个实心的精致圆点
@@ -37,20 +39,25 @@ export function LearningSidebar() {
   const setSidebarOpen = useUIStore((state) => state.setSidebarOpen);
   const stageTitle = useUIStore((state) => state.currentStage);
 
-  const sections = useLearningStore((state) => state.sections);
-  const activeSectionId = useLearningStore((state) => state.activeSectionId);
-  const setActiveSectionId = useLearningStore((state) => state.setActiveSectionId);
-  const loadingOutline = useLearningStore((state) => state.loadingOutline);
-  const sectionContents = useLearningStore((state) => state.sectionContents);
-  const setSectionContent = useLearningStore((state) => state.setSectionContent);
-  const setLoadingContent = useLearningStore((state) => state.setLoadingContent);
-
   const user = useUserStore((state) => state.user);
+  const setHasCompletedCourse = useUserStore((state) => state.setHasCompletedCourse);
+  const hasCompletedCourse = useUserStore((state) => state.hasCompletedCourse);
   const selectedCourseId = useUserStore((state) => state.selectedCourseId);
   const diagnosisReport = useUserStore((state) => state.diagnosisReport);
 
+  // 直接访问store中的状态，避免使用getStageState导致的引用问题
+  const stageStates = useLearningStore((state) => state.stageStates);
+  const currentStageState = selectedCourseId ? stageStates[selectedCourseId] : null;
+  
+  const sections = currentStageState?.sections || [];
+  const activeSectionId = currentStageState?.activeSectionId || null;
+  const loadingOutline = currentStageState?.loadingOutline || false;
+  const sectionContents = currentStageState?.sectionContents || {};
+
   const handleSectionClick = async (sectionId: string) => {
-    setActiveSectionId(sectionId);
+    if (!selectedCourseId) return;
+    
+    useLearningStore.getState().setActiveSectionId(selectedCourseId, sectionId);
 
     // 如果已有缓存，不再请求
     if (sectionContents[sectionId]) return;
@@ -58,8 +65,8 @@ export function LearningSidebar() {
     const section = sections.find((s) => s.id === sectionId);
     if (!section) return;
 
-    setLoadingContent(true);
-    setSectionContent(sectionId, ""); // 清空初始内容
+    useLearningStore.getState().setLoadingContent(selectedCourseId, true);
+    useLearningStore.getState().setSectionContent(selectedCourseId, sectionId, ""); // 清空初始内容
 
     try {
       const res = await fetch("/api/learning/content", {
@@ -68,6 +75,7 @@ export function LearningSidebar() {
         body: JSON.stringify({
           username: user?.username,
           selectedCourseId,
+          sectionId: section.id, // 明确发送 AI 生成的 ID
           sectionTitle: section.title,
           sectionDescription: section.description,
           sectionStatus: section.status,
@@ -89,29 +97,42 @@ export function LearningSidebar() {
         const lines = chunk.split("\n");
 
         for (const line of lines) {
-          if (line.startsWith("data: ")) {
+          const trimmed = line.trim();
+          if (!trimmed) continue;
+
+          // 处理数据模式
+          if (trimmed.startsWith("data: ")) {
+            const dataStr = trimmed.slice(6);
+            if (dataStr === "[DONE]") continue;
+
             try {
-              const data = JSON.parse(line.slice(6));
+              const data = JSON.parse(dataStr);
+              // 处理核心增量内容
               if (data.type === "text-delta" && data.delta) {
                 accumulatedContent += data.delta;
                 
-                // 处理可能被包裹的 ```markdown
+                // 处理可能被包裹的标记
                 let displayContent = accumulatedContent;
                 if (displayContent.startsWith("```markdown")) {
                   displayContent = displayContent.replace(/^```markdown\n?/i, "");
                 }
                 
-                setSectionContent(sectionId, displayContent);
+                useLearningStore.getState().setSectionContent(selectedCourseId, sectionId, displayContent);
               }
             } catch (e) {
-              // Ignore parse errors for partial chunks
+              // 处理非 JSON 的纯文本返回（例如数据库缓存直接返回的内容）
+              if (!trimmed.includes("{")) {
+                accumulatedContent += trimmed.slice(6);
+                useLearningStore.getState().setSectionContent(selectedCourseId, sectionId, accumulatedContent);
+              }
             }
           }
         }
       }
 
       // 最终清理结尾的 ```
-      setSectionContent(
+      useLearningStore.getState().setSectionContent(
+        selectedCourseId,
         sectionId,
         accumulatedContent
           .replace(/^```markdown\n?/i, "")
@@ -120,9 +141,9 @@ export function LearningSidebar() {
       );
     } catch (err) {
       console.error("Failed to stream content:", err);
-      setSectionContent(sectionId, "⚠️ 生成教程内容失败，请稍后重试。");
+      useLearningStore.getState().setSectionContent(selectedCourseId, sectionId, "⚠️ 生成教程内容失败，请稍后重试。");
     } finally {
-      setLoadingContent(false);
+      useLearningStore.getState().setLoadingContent(selectedCourseId, false);
     }
   };
 
@@ -164,60 +185,68 @@ export function LearningSidebar() {
                 <span className="text-xs">暂无学习内容</span>
               </div>
             ) : (
-              [...sections]
-                .sort((a, b) => {
-                  const weights = { reinforce: 0, learn: 1, skip: 2 };
-                  return weights[a.status] - weights[b.status];
-                })
-                .map((section, index) => {
-                  const isActive = activeSectionId === section.id;
-                  const isSkip = section.status === "skip";
-                  const isReinforce = section.status === "reinforce";
-                  
-                  return (
-                    <button
-                      key={section.id}
-                      onClick={() => handleSectionClick(section.id)}
-                      className={cn(
-                        "group w-full flex items-start gap-3 text-left p-2.5 rounded-xl transition-all duration-200",
-                        isActive
-                          ? "bg-primary/5 text-primary font-bold"
-                          : "hover:bg-muted/50 text-foreground/80 hover:text-foreground"
-                      )}
-                    >
-                      <div className="shrink-0 flex items-center justify-center w-5 h-6">
-                        {getStatusIcon(section.status, isActive)}
+              sections.map((section, index) => {
+                const isActive = activeSectionId === section.id;
+                const isSkip = section.status === "skip";
+                const isReinforce = section.status === "reinforce";
+                
+                return (
+                  <button
+                    key={section.id}
+                    onClick={() => handleSectionClick(section.id)}
+                    className={cn(
+                      "group w-full flex items-start gap-3 text-left p-2.5 rounded-xl transition-all duration-200",
+                      isActive
+                        ? "bg-primary/5 text-primary font-bold"
+                        : "hover:bg-muted/50 text-foreground/80 hover:text-foreground"
+                    )}
+                  >
+                    <div className="shrink-0 flex items-center justify-center w-5 h-6">
+                      {getStatusIcon(section.status, isActive)}
+                    </div>
+                    <div className="flex-1 min-w-0 py-0.5">
+                      <div
+                        className={cn(
+                          "text-sm leading-snug transition-colors break-words",
+                          isSkip && !isActive && "opacity-40 font-normal italic",
+                          isActive && "text-primary"
+                        )}
+                      >
+                        {section.title}
                       </div>
-                      <div className="flex-1 min-w-0 py-0.5">
-                        <div
-                          className={cn(
-                            "text-sm leading-snug transition-colors break-words",
-                            isSkip && !isActive && "opacity-40 font-normal italic",
-                            isActive && "text-primary"
-                          )}
-                        >
-                          {section.title}
-                        </div>
-                        
-                        {/* 状态补充说明 - 极简文字标签 */}
-                        <div className="flex items-center gap-1.5 mt-1">
-                          <span className={cn(
-                            "text-[10px] uppercase tracking-wider font-semibold opacity-60",
-                            isReinforce ? "text-amber-600" : isSkip ? "text-muted-foreground" : "text-primary/70"
-                          )}>
-                            {section.status === "reinforce" ? "需强化" : section.status === "skip" ? "已掌握，可复习" : "待学习"}
-                          </span>
-                          {isActive && (
-                            <span className="text-[10px] bg-primary/10 px-1 rounded-sm text-primary font-medium">正在进行</span>
-                          )}
-                        </div>
+                      
+                      <div className="flex items-center gap-1.5 mt-1">
+                        <span className={cn(
+                          "text-[10px] uppercase tracking-wider font-semibold opacity-60",
+                          isReinforce ? "text-amber-600" : isSkip ? "text-muted-foreground" : "text-primary/70"
+                        )}>
+                          {section.status === "reinforce" ? "需强化" : section.status === "skip" ? "已掌握，可复习" : "待学习"}
+                        </span>
+                        {isActive && (
+                          <span className="text-[10px] bg-primary/10 px-1 rounded-sm text-primary font-medium">正在进行</span>
+                        )}
                       </div>
-                    </button>
-                  );
-                })
+                    </div>
+                  </button>
+                );
+              })
             )}
           </div>
         </ScrollArea>
+
+        {/* 侧边栏底部 - 固定区域 */}
+        <div className="p-4 border-t border-border/50 bg-card/50 backdrop-blur-sm">
+          <Button 
+            className="w-full h-10 font-bold rounded-xl shadow-lg shadow-primary/20 flex items-center gap-2 group overflow-hidden relative"
+            onClick={() => setHasCompletedCourse(true)}
+            disabled={hasCompletedCourse || loadingOutline || sections.length === 0}
+          >
+            <div className="absolute inset-0 bg-gradient-to-r from-primary to-primary/80 group-hover:opacity-90 transition-opacity" />
+            <CheckCircle2 className="w-4 h-4 relative z-10" />
+            <span className="relative z-10">完成学习，开始测验</span>
+          </Button>
+          <p className="text-[10px] text-center text-muted-foreground mt-2 font-medium">完成本阶段所有内容后开启</p>
+        </div>
       </div>
     </aside>
   );
