@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getPrisma } from "@/lib/prisma";
+import type { UserProfile } from "@/types";
 
 export async function POST(req: Request) {
   try {
@@ -11,7 +12,7 @@ export async function POST(req: Request) {
 
     const prisma = getPrisma();
 
-    const updateData: any = {};
+    const updateData: Partial<UserProfile> = {};
     if (rolePosition !== undefined) updateData.rolePosition = rolePosition;
     if (roleReport !== undefined) updateData.roleReport = roleReport;
     if (skillLevel !== undefined) updateData.skillLevel = skillLevel;
@@ -21,16 +22,15 @@ export async function POST(req: Request) {
       data: updateData,
     });
 
-    return NextResponse.json({ 
-      success: true, 
+    return NextResponse.json({
+      success: true,
       user: {
         username: user.username,
         rolePosition: user.rolePosition,
         roleReport: user.roleReport,
-        skillLevel: user.skillLevel
-      }
+        skillLevel: user.skillLevel,
+      },
     });
-
   } catch (error: any) {
     console.error("Save profile error:", error);
     return NextResponse.json(

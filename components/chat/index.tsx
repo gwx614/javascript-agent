@@ -12,7 +12,7 @@ import remarkGfm from "remark-gfm";
 interface AiAssistantProps {
   messages: UIMessage[];
   isThinking: boolean; // status === "submitted"
-  isBusy: boolean;     // status === "submitted" || status === "streaming"
+  isBusy: boolean; // status === "submitted" || status === "streaming"
   onSend: (text: string) => void;
   onStop: () => void;
   className?: string;
@@ -47,7 +47,7 @@ function MessageItem({ message }: MessageItemProps) {
   return (
     <div
       className={cn(
-        "flex px-4 py-2 animate-in fade-in slide-in-from-bottom-2 duration-300",
+        "flex px-4 py-2 duration-300 animate-in fade-in",
         isUser ? "justify-end" : "justify-start"
       )}
     >
@@ -55,17 +55,15 @@ function MessageItem({ message }: MessageItemProps) {
         className={cn(
           "max-w-[90%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed shadow-sm",
           isUser
-            ? "bg-primary text-primary-foreground rounded-tr-sm"
-            : "bg-muted/40 border border-border/40 text-foreground rounded-tl-sm"
+            ? "rounded-tr-sm bg-primary text-primary-foreground"
+            : "rounded-tl-sm border border-border/40 bg-muted/40 text-foreground"
         )}
       >
         {isUser ? (
           <div className="whitespace-pre-wrap break-words">{textContent}</div>
         ) : (
-          <div className="prose prose-sm dark:prose-invert max-w-none break-words">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>
-              {textContent}
-            </ReactMarkdown>
+          <div className="prose prose-sm max-w-none break-words dark:prose-invert">
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>{textContent}</ReactMarkdown>
           </div>
         )}
       </div>
@@ -77,25 +75,27 @@ function MessageList({ messages, isLoading }: MessageListProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    bottomRef.current?.scrollIntoView({ behavior: "auto" });
   }, [messages, isLoading]);
 
   if (messages.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-full gap-4 p-4 text-center">
+      <div className="flex h-full flex-col items-center justify-center gap-4 p-4 text-center">
         <div className="relative">
-          <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center">
-            <Bot className="w-8 h-8 text-primary" />
+          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
+            <Bot className="h-8 w-8 text-primary" />
           </div>
-          <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-primary flex items-center justify-center">
-            <Sparkles className="w-3 h-3 text-primary-foreground" />
+          <div className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-primary">
+            <Sparkles className="h-3 w-3 text-primary-foreground" />
           </div>
         </div>
 
         <div className="space-y-1.5">
           <h2 className="text-xl font-bold tracking-tight text-foreground">你好，我是 JS 小智</h2>
-          <p className="text-sm text-muted-foreground max-w-[240px] px-2 leading-relaxed">
-            你的专属前端导师。<br/>遇到不懂的语法或报错，随时问我！
+          <p className="max-w-[240px] px-2 text-sm leading-relaxed text-muted-foreground">
+            你的专属前端导师。
+            <br />
+            遇到不懂的语法或报错，随时问我！
           </p>
         </div>
       </div>
@@ -110,10 +110,10 @@ function MessageList({ messages, isLoading }: MessageListProps) {
 
       {isLoading && (
         <div className="flex px-4 py-2">
-          <div className="flex items-center gap-1.5 px-3 py-2 bg-muted/30 border border-border/40 rounded-2xl rounded-tl-sm">
-            <span className="w-1.5 h-1.5 bg-muted-foreground/40 rounded-full animate-bounce [animation-delay:0ms]" />
-            <span className="w-1.5 h-1.5 bg-muted-foreground/40 rounded-full animate-bounce [animation-delay:150ms]" />
-            <span className="w-1.5 h-1.5 bg-muted-foreground/40 rounded-full animate-bounce [animation-delay:300ms]" />
+          <div className="flex items-center gap-1.5 rounded-2xl rounded-tl-sm border border-border/40 bg-muted/30 px-3 py-2">
+            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground/40 [animation-delay:0ms]" />
+            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground/40 [animation-delay:150ms]" />
+            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground/40 [animation-delay:300ms]" />
           </div>
         </div>
       )}
@@ -146,7 +146,7 @@ function ChatInput({ isLoading, onSend, onStop }: ChatInputProps) {
 
   return (
     <div className="px-3 pb-3 pt-2 text-center">
-      <div className="relative flex items-end gap-2 bg-card/50 border border-border hover:border-border/80 focus-within:border-primary/50 rounded-2xl p-2.5 transition-[border-color,box-shadow] duration-200 text-left">
+      <div className="relative flex items-end gap-2 rounded-2xl border border-border bg-card/50 p-2.5 text-left transition-[border-color,box-shadow] duration-200 focus-within:border-primary/50 hover:border-border/80">
         <textarea
           ref={textareaRef}
           value={input}
@@ -157,9 +157,9 @@ function ChatInput({ isLoading, onSend, onStop }: ChatInputProps) {
           rows={1}
           className={cn(
             "flex-1 bg-transparent text-foreground placeholder:text-muted-foreground",
-            "text-sm leading-relaxed resize-none outline-none",
-            "min-h-[24px] max-h-[200px] overflow-y-auto",
-            "disabled:opacity-50 disabled:cursor-not-allowed"
+            "resize-none text-sm leading-relaxed outline-none",
+            "max-h-[200px] min-h-[24px] overflow-y-auto",
+            "disabled:cursor-not-allowed disabled:opacity-50"
           )}
           onInput={(e) => {
             const target = e.currentTarget;
@@ -172,9 +172,9 @@ function ChatInput({ isLoading, onSend, onStop }: ChatInputProps) {
           <button
             type="button"
             onClick={onStop}
-            className="flex-shrink-0 w-8 h-8 rounded-xl bg-destructive/10 hover:bg-destructive/20 text-destructive flex items-center justify-center transition-colors"
+            className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl bg-destructive/10 text-destructive transition-colors hover:bg-destructive/20"
           >
-            <Square className="w-3.5 h-3.5 fill-current" />
+            <Square className="h-3.5 w-3.5 fill-current" />
           </button>
         ) : (
           <button
@@ -182,17 +182,17 @@ function ChatInput({ isLoading, onSend, onStop }: ChatInputProps) {
             onClick={handleSubmit}
             disabled={!input.trim() || isLoading}
             className={cn(
-              "flex-shrink-0 w-8 h-8 rounded-xl flex items-center justify-center transition-colors",
+              "flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl transition-colors",
               input.trim()
                 ? "bg-primary text-primary-foreground hover:bg-primary/90"
-                : "bg-muted text-muted-foreground cursor-not-allowed"
+                : "cursor-not-allowed bg-muted text-muted-foreground"
             )}
           >
-            <Send className="w-3.5 h-3.5" />
+            <Send className="h-3.5 w-3.5" />
           </button>
         )}
       </div>
-      <p className="text-center text-xs text-muted-foreground mt-2">
+      <p className="mt-2 text-center text-xs text-muted-foreground">
         AI 回答仅供参考，建议结合官方文档学习
       </p>
     </div>
@@ -201,29 +201,22 @@ function ChatInput({ isLoading, onSend, onStop }: ChatInputProps) {
 
 // --- Main Exported Component ---
 
-export function AiAssistant({ 
-  messages, 
-  isThinking, 
-  isBusy, 
-  onSend, 
+export function AiAssistant({
+  messages,
+  isThinking,
+  isBusy,
+  onSend,
   onStop,
-  className
+  className,
 }: AiAssistantProps) {
   return (
-    <aside className={cn(
-      "flex flex-col border-l border-border bg-muted/10",
-      className
-    )}>
-      <main className="flex-1 overflow-y-auto w-full">
+    <aside className={cn("flex flex-col border-l border-border bg-muted/10", className)}>
+      <main className="w-full flex-1 overflow-y-auto">
         <MessageList messages={messages} isLoading={isThinking} />
       </main>
 
       <footer className="flex-shrink-0 border-t border-border bg-card/80 backdrop-blur-md">
-        <ChatInput
-          isLoading={isBusy}
-          onSend={onSend}
-          onStop={onStop}
-        />
+        <ChatInput isLoading={isBusy} onSend={onSend} onStop={onStop} />
       </footer>
     </aside>
   );

@@ -1,4 +1,5 @@
-import { create } from 'zustand';
+import { create } from "zustand";
+import { persist } from "zustand/middleware";
 
 export interface UIState {
   isSidebarOpen: boolean;
@@ -8,10 +9,17 @@ export interface UIState {
   setCurrentStage: (stage: string) => void;
 }
 
-export const useUIStore = create<UIState>((set) => ({
-  isSidebarOpen: true,
-  setSidebarOpen: (isOpen) => set({ isSidebarOpen: isOpen }),
-  toggleSidebar: () => set((state) => ({ isSidebarOpen: !state.isSidebarOpen })),
-  currentStage: "基础语法",
-  setCurrentStage: (stage) => set({ currentStage: stage }),
-}));
+export const useUIStore = create<UIState>()(
+  persist(
+    (set) => ({
+      isSidebarOpen: true,
+      setSidebarOpen: (isOpen) => set({ isSidebarOpen: isOpen }),
+      toggleSidebar: () => set((state) => ({ isSidebarOpen: !state.isSidebarOpen })),
+      currentStage: "基础语法",
+      setCurrentStage: (stage) => set({ currentStage: stage }),
+    }),
+    {
+      name: "ui-storage", // 存储在 localStorage 中的 key
+    }
+  )
+);

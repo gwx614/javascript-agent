@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
+import { getPrisma } from "@/lib/prisma";
 import { streamAI } from "@/lib/ai";
 import { STAGES } from "@/lib/courseConfig";
+import type { KnowledgePointStatus } from "@/types";
 
-const prisma = new PrismaClient();
+const prisma = getPrisma();
 
 export async function POST(req: Request) {
   try {
@@ -32,21 +33,24 @@ export async function POST(req: Request) {
         userId_courseId: {
           userId: user.id,
           courseId: selectedCourseId as string,
-        }
-      }
+        },
+      },
     });
 
     if (!stage) {
-       return NextResponse.json({ error: "请先生成大纲" }, { status: 400 });
+      return NextResponse.json({ error: "请先生成大纲" }, { status: 400 });
     }
 
     // 2. 验证状态是否允许生成教程内容
     if (stage.status !== "STUDYING") {
-      return NextResponse.json({ 
-        error: "状态不允许生成教程内容",
-        currentStatus: stage.status,
-        validStatus: "STUDYING"
-      }, { status: 400 });
+      return NextResponse.json(
+        {
+          error: "状态不允许生成教程内容",
+          currentStatus: stage.status,
+          validStatus: "STUDYING",
+        },
+        { status: 400 }
+      );
     }
 
     // 3. 验证是否已生成大纲
@@ -56,7 +60,7 @@ export async function POST(req: Request) {
 
     // 2. 检查此小节是否已生成过内容
     const { sectionId } = data; // 从前端获取具体的 ID (例如 section_1)
-    
+
     if (!sectionId) {
       return NextResponse.json({ error: "缺少 sectionId" }, { status: 400 });
     }
@@ -65,9 +69,9 @@ export async function POST(req: Request) {
       where: {
         stageId_sectionId: {
           stageId: stage.id,
-          sectionId: sectionId
-        }
-      }
+          sectionId: sectionId,
+        },
+      },
     });
 
     if (existingContent) {
@@ -91,71 +95,73 @@ export async function POST(req: Request) {
     const courseTitle = selectedStage?.title || "未知阶段";
     const skillLevel = user.skillLevel || "beginner";
 
-    // 根据状态调整教学深度
+    //根据状态调整教学深度，增强状态指令的“动作感”和“侧重点”
     let depthInstruction = "";
     if (sectionStatus === "skip") {
       depthInstruction =
-        "用户已经掌握此知识点，请提供精炼的复习内容和进阶技巧，重点放在易错点、面试考点和最佳实践。篇幅较短即可。";
+        "【策略：极速通关与拔高】用户已掌握核心概念。请跳过基础语法，直接切入：1) 底层运行机制（如内存、Event Loop）；2) 极端的边界情况与 Bug 预防；3) 复杂业务场景下的架构级实践。**必须极其硬核，不要废话**。";
     } else if (sectionStatus === "reinforce") {
       depthInstruction =
-        "用户对此知识点有一定了解但不扎实，请着重讲解核心概念和易混淆的地方，多给实战代码示例。";
+        "【策略：排雷与实战巩固】用户有概念但不扎实。请缩减基础定义，**聚焦于“容易混淆的盲区”**：1) 深入对比相似概念；2) 针对诊断报告中的错误进行深度剖析（为什么错，怎么改）；3) 真实开发场景的高频应用。";
     } else {
       depthInstruction =
-        "用户对此知识点不了解，请从零讲起，循序渐进，概念解释要详尽，代码示例要丰富且有详细注释。";
+        "【策略：破冰与白话入门】用户是零基础或无数据。**绝对禁止一上来就抛专业术语**。请：1) 必须用一个极其通俗的生活化场景（类比）来开场；2) 循序渐进，从“这东西到底有什么用”讲起；3) 细抠最最基础的语法。";
     }
 
-    // 从诊断报告中提取当前知识点的教学建议
+    // 从诊断报告中提取当前知识点的教学建议，匹配逻辑保持不变，但强化传给 AI 的上下文语气
     let diagnosisContext = "";
     if (diagnosisReport?.knowledgePoints) {
-      const matchedKP = (diagnosisReport.knowledgePoints as any[]).find(
-        (kp: any) =>
+      const matchedKP = (diagnosisReport.knowledgePoints as KnowledgePointStatus[]).find(
+        (kp: KnowledgePointStatus) =>
           sectionTitle.includes(kp.name) ||
           kp.name.includes(sectionTitle?.split("：")[0]?.split("—")[0]?.trim())
       );
       if (matchedKP?.teachingAdvice) {
         diagnosisContext = `
-## 诊断分析（来自课前摸底的精准指导，请务必参考）
-- 用户在此知识点的掌握度: ${matchedKP.mastery}
-- AI 教学建议: ${matchedKP.teachingAdvice}
-
-请根据以上诊断分析，有针对性地调整教程内容的重点和讲解方式。`;
+## 重点纠错（来自该用户的错题记录）
+此用户存在以下认知误区: "${matchedKP.teachingAdvice}"
+要求：在讲到相关点时，直接用一两句话或代码注释点醒用户。`;
       }
     }
 
-    const systemPrompt = `你是一位资深的 JavaScript 教学导师，正在为用户编写【${courseTitle}】课程中【${sectionTitle}】这一小节的详细学习教程。
+    // 4. 三次迭代：通俗易懂的学霸笔记版 Prompt
+    const systemPrompt = `你是一个讲课极其生动、图文并茂的技术大牛。你正在为用户编写【${courseTitle}】课程中【${sectionTitle}】的学习笔记。
 
-用户信息:
-- 角色定位: ${user.roleReport || "未知"}
-- 技术水平: ${skillLevel}
+# 教学大纲预设要求 (核心指令)
+本小节务必围绕以下核心描述展开教学：
+> ${sectionDescription}
 
-小节信息:
-- 标题: ${sectionTitle}
-- 描述: ${sectionDescription || ""}
-- 学习状态: ${sectionStatus || "learn"}
+# 用户上下文
+- 职业定位: ${user.roleReport || "前端开发"}
+- 基础水平: ${skillLevel}
+- 学习策略: ${sectionStatus || "learn"}
 
 ${depthInstruction}
 ${diagnosisContext}
 
-请生成一篇高质量的 Markdown 格式教程文档，要求：
+# 生成规范 (最高优先级)
 
-1. **结构清晰**：使用 ## 和 ### 层级标题组织内容
-2. **代码丰富**：关键概念都配有 \`\`\`javascript 代码块示例，代码中包含详细中文注释
-3. **循序渐进**：从概念到实践逐步深入
-4. **实用建议**：在文末提供 💡 实用提示（常见错误、最佳实践等）
-5. **推荐资源**：在文末推荐 2-3 个对该知识点最有帮助的学习资源链接
-6. **篇幅控制**：保持内容充实但不冗长，约 1200-2000 字
+1. **“学霸笔记”风格体裁**：文章必须像一份精心整理的、图文并茂的复习笔记。语言要通俗接地气，千万不要像机器翻译的官方文档。采用清晰的层级（如：一、大白话解剖，二、核心对比，三、真实业务演示）。
+2. **生动开场与类比**：在解释任何抽象语法前，**必须先用一个极度生活化的通俗比喻**（例如：把Promise比作取餐盘，把闭包比作自带干粮的背包客）来铺垫。
+3. **图解辅助思维**：不要用干巴巴的文字！凡是涉及到“原理”、“对比”、“状态转移”、“内存流转”的东西，**必须优先输出 Markdown 表格或 ASCII 排版图解**。
+4. **【核心约束】克制的微代码**：
+   - 最长的演示代码块**绝对禁止超过 15 行**！
+   - 写代码只写“最硬核的增量逻辑”，去掉假数据和 \`console.log\` 刷屏。
+   - 所有变量名必须带着浓厚的【职业定位】风味（如电商用 \`checkoutStatus\`，不准用 \`demo/test\`）。
+5. **画龙点睛的排版**：不允许使用任何Emoji（如 📌、💡、⚠️）。
 
-直接输出 Markdown 文本即可，不要包裹在 JSON 或代码块中。`;
+一句话核心诉求：用最说人话的类比、最一目了然的图表框架，以及贴合对方职业方向的微代码，生成一篇阅读体验极佳的“高维降维学习笔记”。请直接输出纯 Markdown。`;
 
     const stream = await streamAI({
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: `请为【${sectionTitle}】生成详细的 Markdown 学习教程。` },
       ],
-      temperature: 0.6,
+      temperature: 0.5,
       maxTokens: 3000,
       label: "Content Stream",
     });
+    console.log(systemPrompt);
 
     // 3. 为了持久化，我们需要拦截并保存流内容
     // 这里使用一个简单的 TransformStream 来捕获累积的内容
@@ -191,20 +197,20 @@ ${diagnosisContext}
             where: {
               stageId_sectionId: {
                 stageId: stage!.id,
-                sectionId: sectionId
-              }
+                sectionId: sectionId,
+              },
             },
             update: { content: fullContent },
             create: {
               stageId: stage!.id,
               sectionId: sectionId,
-              content: fullContent
-            }
+              content: fullContent,
+            },
           });
         } catch (e) {
           console.error("Failed to save stream content to DB", e);
         }
-      }
+      },
     });
 
     return new Response(stream.pipeThrough(transformStream), {

@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
+import { getPrisma } from "@/lib/prisma";
 import { callAI } from "@/lib/ai";
 import { STAGES } from "@/lib/courseConfig";
+import type { KnowledgePointStatus } from "@/types";
 
-const prisma = new PrismaClient();
+const prisma = getPrisma();
 
 export async function POST(req: Request) {
   try {
@@ -25,8 +26,8 @@ export async function POST(req: Request) {
         userId_courseId: {
           userId: user.id,
           courseId: selectedCourseId as string,
-        }
-      }
+        },
+      },
     });
 
     // 如果没有记录，创建一个新的阶段记录
@@ -35,19 +36,27 @@ export async function POST(req: Request) {
         data: {
           userId: user.id,
           courseId: selectedCourseId as string,
-          status: "PRE_ASSESSMENT"
-        }
+          status: "PRE_ASSESSMENT",
+        },
       });
     }
 
     // 2. 验证状态是否允许生成大纲
-    // 允许的状态：PRE_ASSESSMENT(新阶段初始状态), PRE_REPORT(已完成摸底), STUDY_OUTLINE, STUDYING
-    if (stage.status !== "PRE_ASSESSMENT" && stage.status !== "PRE_REPORT" && stage.status !== "STUDY_OUTLINE" && stage.status !== "STUDYING") {
-      return NextResponse.json({ 
-        error: "状态不允许生成大纲",
-        currentStatus: stage.status,
-        validStatuses: ["PRE_ASSESSMENT", "PRE_REPORT", "STUDY_OUTLINE", "STUDYING"]
-      }, { status: 400 });
+    // 允许的状态：PRE_REPORT(已完成摸底), STUDY_OUTLINE, STUDYING
+    // (修复：严禁在未做初步测评的 PRE_ASSESSMENT 状态抢跑生成错误的大纲)
+    if (
+      stage.status !== "PRE_REPORT" &&
+      stage.status !== "STUDY_OUTLINE" &&
+      stage.status !== "STUDYING"
+    ) {
+      return NextResponse.json(
+        {
+          error: "状态错误，无法生成大纲。请确认已完成该阶段课前诊断。",
+          currentStatus: stage.status,
+          validStatuses: ["PRE_REPORT", "STUDY_OUTLINE", "STUDYING"],
+        },
+        { status: 400 }
+      );
     }
 
     // 3. 强制重新生成大纲（移除已有的缓存判断，确保每次都能根据最新诊断生成）
@@ -60,51 +69,119 @@ export async function POST(req: Request) {
     // 构建诊断参考信息（辅助标注重点和教学方向）
     let diagRef = "";
     if (diagnosisReport?.knowledgePoints) {
+      const specificWeaknesses = diagnosisReport?.knowledgePoints
+        ?.filter((kp: KnowledgePointStatus) => kp.mastery === "low" || kp.mastery === "medium")
+        .map(
+          (kp: KnowledgePointStatus) =>
+            `  · ${kp.name}: 掌握度=${kp.mastery}, 建议=${kp.action}\n    教学指导: ${kp.teachingAdvice || "无"}`
+        )
+        .join("\n");
+
       diagRef = `
 ## 用户的课前诊断报告
 以下诊断信息用于：1）确定每个知识点的学习深度(status)；2）指导 description 的教学方向
-${(diagnosisReport.knowledgePoints || [])
-  .map(
-    (kp: any) =>
-      `  · ${kp.name}: 掌握度=${kp.mastery}, 建议=${kp.action}\n    教学指导: ${kp.teachingAdvice || kp.note || "无"}`
-  )
-  .join("\n")}
+${specificWeaknesses}
 角色建议: ${diagnosisReport.roleAdvice || "无"}`;
     }
-
     // 将 coreKnowledge 列表直接构造为必须生成的小节骨架
-    const knowledgeList = coreKnowledge
-      .map((k, i) => `  ${i + 1}. ${k}`)
-      .join("\n");
+    const knowledgeList = coreKnowledge.map((k, i) => `  ${i + 1}. ${k}`).join("\n");
 
-    const systemPrompt = `你是一位专业的 JavaScript 课程设计师。
-请你为用户设计一份【${courseTitle}】阶段的**系统性学习大纲**。
-
-## 课程信息
-- 阶段名称: ${courseTitle}
-- 学习目标: ${courseObjective}
-- 核心知识点（按教学顺序排列）:
+    const systemPrompt = `
+你是一位经验丰富的 JavaScript 课程架构师与技术导师。
+你的任务是根据【课程信息 + 用户画像 + 课前诊断报告】为用户生成一份结构清晰、教学顺序合理的 **学习大纲（Learning Outline）**。
+该大纲将作为后续 AI 教程生成的结构蓝图，因此必须具有清晰的教学逻辑与精准的学习深度控制。
+--------------------------------------------------
+# 课程信息
+阶段名称：
+${courseTitle}
+学习目标：
+${courseObjective}
+核心知识点（严格按教学顺序）：
 ${knowledgeList}
-
-## 用户信息
-- 角色定位: ${user.rolePosition || "学习者"}
-- 画像报告: ${user.roleReport || "无"}
-- 技术水平: ${user.skillLevel || "beginner"}
+--------------------------------------------------
+# 用户信息
+角色定位：
+${user.rolePosition || "学习者"}
+用户画像：
+${user.roleReport || "无"}
+技术水平：
+${user.skillLevel || "beginner"}
+水平说明：
+- beginner: 初学者；intermediate: 有一定经验；advanced: 有丰富项目经验
+--------------------------------------------------
+# 诊断参考信息（辅助标注重点和教学方向）
 ${diagRef}
+--------------------------------------------------
+# 生成大纲的核心原则
+1. 结构规则
 
-## 大纲生成规则
-
-1. **每个核心知识点必须对应一个独立小节**，这是课程的主干结构，不允许合并或遗漏
-2. 小节的排列顺序必须与上方核心知识点列表的教学顺序一致
-3. 每个小节的 title 应以该核心知识点为核心主题，可以适当扩展成更具体的教学标题
-4. 每个小节的 description 用一句话描述这一小节会学什么（100字以内）
-5. 每个小节的 status 根据诊断报告来确定学习深度：
-   - "skip": 该知识点用户已掌握（诊断中 mastery=high），教程将以精炼复习为主
-   - "reinforce": 该知识点用户有概念但不扎实（mastery=medium），教程将侧重实战巩固
-   - "learn": 该知识点用户不了解（mastery=low）或无诊断信息，教程将从零讲起
-6. 如果某个核心知识点在诊断报告中没有提及，默认 status 为 "learn"
-
-严格仅输出以下 JSON 数组（不要输出任何其他文字）：
+- 每个核心知识点 **必须生成一个独立小节**
+- 小节数量必须与核心知识点数量一致
+- 不允许新增或删除知识点
+- 小节顺序必须 **严格保持与核心知识点列表一致**
+--------------------------------------------------
+2. 小节标题规则
+title 必须：
+- 以该知识点为核心
+- 可以适当扩展为更具体的教学标题
+- 必须清晰表达本节教学主题
+示例：
+知识点：闭包  
+标题：理解 JavaScript 闭包及其实际应用
+--------------------------------------------------
+3. description 生成规则
+description 用 **一小段话（≤100字）** 描述本小节会学习的内容。
+description 应结合：
+- 课程目标
+- 用户技术水平
+- 诊断报告中的 teachingAdvice
+重点说明：
+- 学什么
+- 为什么学
+- 如何应用
+--------------------------------------------------
+4. 学习深度（status）判定规则
+status 只能是：
+learn  
+reinforce  
+skip  
+判定优先级如下：
+① 如果诊断报告中存在该知识点：
+action = skip → status = skip  
+action = reinforce → status = reinforce  
+action = learn → status = learn  
+② 如果存在 score：
+score ≥ 80 → skip  
+50 ≤ score < 80 → reinforce  
+score < 50 → learn  
+③ 如果诊断报告中没有该知识点：
+默认 status = learn
+--------------------------------------------------
+5. 教学重点调整
+根据 status 调整 description 的教学方向：
+skip
+- 以快速复习为主
+- 强调关键概念回顾
+reinforce
+- 重点通过代码示例巩固
+- 解决常见误区
+learn
+- 从基础概念讲起
+- 逐步建立理解
+--------------------------------------------------
+6. 用户角色适配
+根据用户角色定位调整学习侧重点。
+例如：
+前端工程师
+- 强调 DOM / 浏览器行为
+Node开发
+- 强调运行机制
+面试准备
+- 强调原理与陷阱
+--------------------------------------------------
+# 输出要求（非常重要）
+必须只输出 JSON 数组，不允许任何解释文字。
+JSON结构必须完全符合：
 [
   {
     "id": "section_1",
@@ -112,7 +189,17 @@ ${diagRef}
     "description": "一句话描述",
     "status": "learn 或 reinforce 或 skip"
   }
-]`;
+]
+--------------------------------------------------
+# 输出前检查
+在输出之前请确认：
+1 小节数量 = 核心知识点数量  
+2 小节顺序与知识点顺序完全一致  
+3 status 只使用 learn / reinforce / skip  
+4 description ≤ 100 字  
+5 JSON 格式合法可解析  
+只输出 JSON。
+`;
 
     let content = await callAI({
       messages: [
@@ -124,8 +211,12 @@ ${diagRef}
       jsonMode: true,
       label: "Outline",
     });
+    console.log(systemPrompt);
 
-    content = content.replace(/```json/g, "").replace(/```/g, "").trim();
+    content = content
+      .replace(/```json/g, "")
+      .replace(/```/g, "")
+      .trim();
 
     try {
       const parsed = JSON.parse(content);
@@ -138,26 +229,23 @@ ${diagRef}
       if (stage) {
         await prisma.courseStage.update({
           where: { id: stage.id },
-          data: { 
+          data: {
             learningOutline: outlineStr,
-            status: "STUDYING"
-          }
+            status: "STUDYING",
+          },
         });
       }
 
       return NextResponse.json({ sections: finalArray });
     } catch {
       console.error("Failed to parse outline JSON", content);
-      return NextResponse.json(
-        { error: "AI 生成的大纲格式错误" },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: "AI 生成的大纲格式错误" }, { status: 500 });
     }
   } catch (error: any) {
     console.error("Outline endpoint error:", error);
-    return new Response(
-      JSON.stringify({ error: "生成学习大纲失败，请稍后重试" }),
-      { status: 500, headers: { "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ error: "生成学习大纲失败，请稍后重试" }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    });
   }
 }

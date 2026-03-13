@@ -1,6 +1,7 @@
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
-import { UserProfile, DiagnosisReport } from '@/types';
+import { create } from "zustand";
+import { persist } from "zustand/middleware";
+import { UserProfile, DiagnosisReport } from "@/types";
+import { useLearningStore } from "./useLearningStore";
 
 export interface UserState {
   user: UserProfile | null;
@@ -42,44 +43,69 @@ export const useUserStore = create<UserState>()(
       _hasHydrated: false,
       stageAssessed: {},
       login: (user) => set({ user, isAuthenticated: true }),
-      logout: () => set({ user: null, isAuthenticated: false, hasOnboarded: false, selectedCourseId: null, diagnosisReport: null, hasCompletedCourse: false, finalReport: null, stageAssessed: {} }),
-      updateUser: (updates) => set((state) => ({
-        user: state.user ? { ...state.user, ...updates } : null
-      })),
+      logout: () => {
+        // 清空学习数据缓存，防止多用户串台泄露
+        useLearningStore.getState().resetAll();
+        set({
+          user: null,
+          isAuthenticated: false,
+          hasOnboarded: false,
+          selectedCourseId: null,
+          diagnosisReport: null,
+          hasCompletedCourse: false,
+          finalReport: null,
+          stageAssessed: {},
+        });
+      },
+      updateUser: (updates) =>
+        set((state) => ({
+          user: state.user ? { ...state.user, ...updates } : null,
+        })),
       setOnboarded: (status) => set({ hasOnboarded: status }),
-      setSelectedCourseId: (id) => set({ selectedCourseId: id }),
+      setSelectedCourseId: (id) =>
+        set({
+          selectedCourseId: id,
+          // 关键修复：当课程阶段切换时，必须即刻清空属于上一个阶段的各类专属全局临时报告，
+          // 防止前端挂载太快而把 A 阶段的报告错误丢给 B 阶段的页面进而产生跨阶段污染。
+          diagnosisReport: null,
+          finalReport: null,
+          hasCompletedCourse: false,
+        }),
       setDiagnosisReport: (report) => set({ diagnosisReport: report }),
       setHasCompletedCourse: (status) => set({ hasCompletedCourse: status }),
       setFinalReport: (report) => set({ finalReport: report }),
       setHasHydrated: (state) => set({ _hasHydrated: state }),
-      setStageAssessed: (courseId, assessed) => set((state) => ({
-        stageAssessed: {
-          ...state.stageAssessed,
-          [courseId]: assessed
-        }
-      })),
+      setStageAssessed: (courseId, assessed) =>
+        set((state) => ({
+          stageAssessed: {
+            ...state.stageAssessed,
+            [courseId]: assessed,
+          },
+        })),
       isStageAssessed: (courseId) => {
         if (!courseId) return false;
         return get().stageAssessed[courseId] || false;
       },
       syncWithBackend: (courseId, data) => {
         if (!data || !courseId) return;
-        // 根据后端状态判断该阶段是否已完成摸底
-        // PRE_ASSESSMENT = 未完成摸底, 其他状态 = 已完成摸底
-        const isAssessed = data.status !== "PRE_ASSESSMENT";
+        // 根据后端状态判断该阶段是否已完成摸底流程并进入了学习区
+        // 修复：不能只排斥 PRE_ASSESSMENT。如果用户正停留在看诊断报告（PRE_REPORT），
+        // 他在前端也不应该进入左侧大纲区（因为还没点"开始学习"）。
+        // 因此只有在明确离开 PRE_REPORT 之后才算 "Assessed=true" 并放行到大纲区。
+        const isAssessed = !["PRE_ASSESSMENT", "PRE_REPORT"].includes(data.status);
         set({
           stageAssessed: {
             ...get().stageAssessed,
-            [courseId]: isAssessed
+            [courseId]: isAssessed,
           },
           diagnosisReport: data.preReport,
           hasCompletedCourse: ["POST_ASSESSMENT", "POST_REPORT", "COMPLETED"].includes(data.status),
           finalReport: data.postReport,
         });
-      }
+      },
     }),
     {
-      name: 'user-storage', // key in localStorage
+      name: "user-storage", // key in localStorage
       onRehydrateStorage: () => (state) => {
         state?.setHasHydrated(true);
       },

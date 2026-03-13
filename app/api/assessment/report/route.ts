@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
+import { getPrisma } from "@/lib/prisma";
 import { callAI } from "@/lib/ai";
 import { STAGES } from "@/lib/courseConfig";
+import type { AssessmentQuestion } from "@/types";
 
-const prisma = new PrismaClient();
+const prisma = getPrisma();
 
 export async function POST(req: Request) {
   try {
@@ -25,8 +26,8 @@ export async function POST(req: Request) {
         userId_courseId: {
           userId: user.id,
           courseId: selectedCourseId as string,
-        }
-      }
+        },
+      },
     });
 
     // 2. 如果已有结课报告，直接返回
@@ -44,7 +45,7 @@ export async function POST(req: Request) {
 
     // 组装答题情况文本
     const qaText = (questions || [])
-      .map((q: any, i: number) => {
+      .map((q: AssessmentQuestion, i: number) => {
         const userAnswer = answers?.[q.id];
         const answerStr = Array.isArray(userAnswer)
           ? userAnswer.join("、")
@@ -87,8 +88,7 @@ export async function POST(req: Request) {
   ],
   "recommendation": {
     "action": "restart" 或 "next",
-    "reason": "为什么给出这个建议",
-    "nextStep": "具体建议在接下来的学习中重点关注什么"
+    "reason": "为什么给出这个建议"
   }
 }
 
@@ -105,7 +105,10 @@ export async function POST(req: Request) {
       label: "FinalReport",
     });
 
-    content = content.replace(/```json/g, "").replace(/```/g, "").trim();
+    content = content
+      .replace(/```json/g, "")
+      .replace(/```/g, "")
+      .trim();
 
     try {
       const parsed = JSON.parse(content);
@@ -115,10 +118,10 @@ export async function POST(req: Request) {
       if (stage) {
         await prisma.courseStage.update({
           where: { id: stage.id },
-          data: { 
+          data: {
             postReport: postReportStr,
-            status: "COMPLETED"
-          }
+            status: "COMPLETED",
+          },
         });
       }
 

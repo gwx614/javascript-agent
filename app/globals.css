@@ -74,9 +74,21 @@
     @apply bg-background text-foreground;
     min-height: 100vh;
     /* 优化中文字体栈：优先系统原生高质量字体 */
-    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", sans-serif;
+    font-family:
+      system-ui,
+      -apple-system,
+      BlinkMacSystemFont,
+      "Segoe UI",
+      Roboto,
+      "Helvetica Neue",
+      Arial,
+      "PingFang SC",
+      "Hiragino Sans GB",
+      "Microsoft YaHei",
+      "微软雅黑",
+      sans-serif;
     /* 解决模糊问题：设置稍微厚实的基础字重 (450-500) 会让中文在 Windows 上更扎实 */
-    font-weight: 450; 
+    font-weight: 450;
     letter-spacing: 0.01em; /* 略微拉开字间距减少笔画重叠 */
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: initial;
@@ -85,31 +97,17 @@
 
   /* 白天主题背景 */
   :root body {
-    background: radial-gradient(
-        ellipse at top left,
-        rgba(59, 130, 246, 0.05) 0%,
-        transparent 50%
-      ),
-      radial-gradient(
-        ellipse at bottom right,
-        rgba(14, 165, 233, 0.03) 0%,
-        transparent 50%
-      ),
+    background:
+      radial-gradient(ellipse at top left, rgba(59, 130, 246, 0.05) 0%, transparent 50%),
+      radial-gradient(ellipse at bottom right, rgba(14, 165, 233, 0.03) 0%, transparent 50%),
       hsl(0 0% 100%);
   }
 
   /* 暗黑主题背景 */
   .dark body {
-    background: radial-gradient(
-        ellipse at top left,
-        rgba(59, 130, 246, 0.08) 0%,
-        transparent 50%
-      ),
-      radial-gradient(
-        ellipse at bottom right,
-        rgba(14, 165, 233, 0.05) 0%,
-        transparent 50%
-      ),
+    background:
+      radial-gradient(ellipse at top left, rgba(59, 130, 246, 0.08) 0%, transparent 50%),
+      radial-gradient(ellipse at bottom right, rgba(14, 165, 233, 0.05) 0%, transparent 50%),
       hsl(222.2 47.4% 11.2%);
   }
 
@@ -123,7 +121,7 @@
   }
 
   :root ::-webkit-scrollbar-thumb {
-    @apply bg-gray-300 rounded-full;
+    @apply rounded-full bg-gray-300;
   }
 
   :root ::-webkit-scrollbar-thumb:hover {
@@ -132,7 +130,7 @@
 
   /* 自定义滚动条样式 - 暗黑主题 */
   .dark ::-webkit-scrollbar-thumb {
-    @apply bg-white/10 rounded-full;
+    @apply rounded-full bg-white/10;
   }
 
   .dark ::-webkit-scrollbar-thumb:hover {
@@ -172,5 +170,78 @@
     to {
       transform: translateY(0);
     }
+  }
+}
+
+/* ============================================================
+   纸质感 & 笔记本样式
+   ============================================================ */
+@layer components {
+  .paper-sheet {
+    @apply relative overflow-hidden bg-transparent transition-colors duration-500;
+  }
+
+  /* 笔记本横格线背景 - 极致弱化版 (微调加深) */
+  .notebook-lines {
+    background-image: 
+      /* 垂直页边线 - 红色稍微加深，位置左移 */
+      linear-gradient(
+        90deg,
+        transparent 32px,
+        rgba(255, 100, 100, 0.18) 32px,
+        rgba(255, 100, 100, 0.18) 33px,
+        transparent 33px
+      ),
+      /* 水平横格线 - 浅灰稍微加深 */ linear-gradient(rgba(0, 0, 0, 0.04) 1px, transparent 1px);
+    background-size:
+      100% 100%,
+      100% 2.2rem;
+    line-height: 2.2rem;
+  }
+
+  .dark .notebook-lines {
+    background-image:
+      linear-gradient(
+        90deg,
+        transparent 32px,
+        rgba(255, 100, 100, 0.15) 32px,
+        rgba(255, 100, 100, 0.15) 33px,
+        transparent 33px
+      ),
+      linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  }
+
+  .notebook-padding {
+    @apply py-6 pl-[48px] pr-12;
+  }
+
+  /* 手绘感块引用 */
+  .handwritten-quote {
+    @apply my-4 rounded-r-lg border-l-4 border-amber-400/30 bg-amber-50/10 px-4 py-2 italic dark:bg-amber-900/10;
+  }
+
+  /* 适配 Prose 中的列表和标题，使其贴合横线且更加清晰显眼 */
+  .prose-notebook {
+    @apply font-sans text-foreground/95;
+    font-weight: 500; /* 加重正文字体，解决看不清的问题 */
+  }
+
+  .prose-notebook h1,
+  .prose-notebook h2,
+  .prose-notebook h3 {
+    @apply mb-2 mt-6 border-b-0 font-extrabold tracking-tight text-foreground;
+  }
+
+  .prose-notebook strong {
+    @apply rounded-sm bg-amber-100/30 px-1 font-bold text-foreground dark:bg-amber-900/20; /* 给主干加粗轻微高亮 */
+  }
+
+  .prose-notebook ul,
+  .prose-notebook ol {
+    @apply my-2;
+  }
+
+  .prose-notebook li {
+    @apply mb-0.5;
   }
 }

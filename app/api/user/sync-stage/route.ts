@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
+import { getPrisma } from "@/lib/prisma";
 
-const prisma = new PrismaClient();
+const prisma = getPrisma();
 
 export async function POST(req: Request) {
   try {
@@ -21,12 +21,12 @@ export async function POST(req: Request) {
       where: {
         userId_courseId: {
           userId: user.id,
-          courseId: courseId
-        }
+          courseId: courseId,
+        },
       },
       include: {
-        sectionContents: true
-      }
+        sectionContents: true,
+      },
     });
 
     // 如果没有记录，创建一个新的阶段记录
@@ -35,11 +35,11 @@ export async function POST(req: Request) {
         data: {
           userId: user.id,
           courseId: courseId,
-          status: "PRE_ASSESSMENT"
+          status: "PRE_ASSESSMENT",
         },
         include: {
-          sectionContents: true
-        }
+          sectionContents: true,
+        },
       });
     }
 
@@ -47,34 +47,37 @@ export async function POST(req: Request) {
     if (newStage) {
       // 验证状态转换是否合法
       const validStatusTransitions: Record<string, string[]> = {
-        "PRE_ASSESSMENT": ["PRE_REPORT"],
-        "PRE_REPORT": ["STUDY_OUTLINE", "STUDYING"],
-        "STUDY_OUTLINE": ["STUDYING"],
-        "STUDYING": ["POST_ASSESSMENT"],
-        "POST_ASSESSMENT": ["POST_REPORT"],
-        "POST_REPORT": ["COMPLETED"],
-        "COMPLETED": []
+        PRE_ASSESSMENT: ["PRE_REPORT"],
+        PRE_REPORT: ["STUDY_OUTLINE", "STUDYING"],
+        STUDY_OUTLINE: ["STUDYING"],
+        STUDYING: ["POST_ASSESSMENT"],
+        POST_ASSESSMENT: ["POST_REPORT"],
+        POST_REPORT: ["COMPLETED"],
+        COMPLETED: [],
       };
 
       if (!validStatusTransitions[stage.status]?.includes(newStage)) {
-        return NextResponse.json({ 
-          error: "状态转换不合法",
-          currentStatus: stage.status,
-          validTransitions: validStatusTransitions[stage.status]
-        }, { status: 400 });
+        return NextResponse.json(
+          {
+            error: "状态转换不合法",
+            currentStatus: stage.status,
+            validTransitions: validStatusTransitions[stage.status],
+          },
+          { status: 400 }
+        );
       }
 
       // 更新阶段状态
       stage = await prisma.courseStage.update({
         where: {
-          id: stage.id
+          id: stage.id,
         },
         data: {
-          status: newStage
+          status: newStage,
         },
         include: {
-          sectionContents: true
-        }
+          sectionContents: true,
+        },
       });
     }
 
@@ -86,12 +89,11 @@ export async function POST(req: Request) {
       learningOutline: stage.learningOutline ? JSON.parse(stage.learningOutline) : null,
       postQuestions: stage.postQuestions ? JSON.parse(stage.postQuestions) : null,
       postReport: stage.postReport ? JSON.parse(stage.postReport) : null,
-      sectionContents: stage.sectionContents.map((sc: any) => ({
+      sectionContents: stage.sectionContents.map((sc: { sectionId: string; content: string }) => ({
         sectionId: sc.sectionId,
-        content: sc.content
-      }))
+        content: sc.content,
+      })),
     });
-
   } catch (error: any) {
     console.error("Sync stage error:", error);
     return NextResponse.json({ error: "同步进度失败" }, { status: 500 });
