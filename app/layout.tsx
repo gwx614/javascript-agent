@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { ThemeProvider } from "@/components/theme-provider";
-import { GlobalHeader } from "@/components/GlobalHeader";
+import { ThemeProvider } from "@/components/layout/ThemeProvider";
+import { GlobalHeader } from "@/components/layout/GlobalHeader";
 
 export const metadata: Metadata = {
   title: "JS 小智 - JavaScript 智能学习助手",

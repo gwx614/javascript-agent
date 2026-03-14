@@ -127,6 +127,9 @@ export function AssessmentForm() {
       } else if (data.report) {
         setReport(data.report);
         setDiagnosisReport(data.report);
+        if (selectedCourseId) {
+          useUserStore.getState().setCourseStatus(selectedCourseId, "PRE_REPORT");
+        }
       }
     } catch (err) {
       alert("提交诊断失败，请重试。");
@@ -156,6 +159,7 @@ export function AssessmentForm() {
       });
       // 告诉页面可以进入左侧双栏的正常学习形态了
       useUserStore.getState().setStageAssessed(selectedCourseId, true);
+      useUserStore.getState().setCourseStatus(selectedCourseId, "STUDY_OUTLINE");
       console.log("Stage advanced to STUDY_OUTLINE and assessed state flag set.");
     } catch (err) {
       console.error("Failed to sync stage transition", err);

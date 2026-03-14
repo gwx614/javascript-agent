@@ -29,9 +29,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       }
     } else {
       // 检测系统偏好
-      const prefersDark = window.matchMedia(
-        "(prefers-color-scheme: dark)"
-      ).matches;
+      const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
       const initialTheme = prefersDark ? "dark" : "light";
       setThemeState(initialTheme);
       if (prefersDark) {

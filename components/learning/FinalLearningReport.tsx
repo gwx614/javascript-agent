@@ -47,6 +47,7 @@ export function FinalLearningReport({
     // 3. 同步重置前端状态：重置评估状态和大纲，重新生成大纲
     if (selectedCourseId) {
       setStageAssessed(selectedCourseId, false);
+      useUserStore.getState().setCourseStatus(selectedCourseId, "PRE_ASSESSMENT");
     }
     setHasCompletedCourse(false);
     setFinalReport(null);

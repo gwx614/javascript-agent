@@ -40,6 +40,7 @@ export function LearningSidebar() {
   const setHasCompletedCourse = useUserStore((state) => state.setHasCompletedCourse);
   const hasCompletedCourse = useUserStore((state) => state.hasCompletedCourse);
   const selectedCourseId = useUserStore((state) => state.selectedCourseId);
+  const setCourseStatus = useUserStore((state) => state.setCourseStatus);
   const diagnosisReport = useUserStore((state) => state.diagnosisReport);
 
   // 直接访问store中的状态，避免使用getStageState导致的引用问题
@@ -255,7 +256,12 @@ export function LearningSidebar() {
         <div className="border-t border-border/50 bg-card/50 p-4 pb-10 backdrop-blur-sm">
           <Button
             className="group relative flex h-10 w-full items-center gap-2 overflow-hidden rounded-xl font-bold shadow-lg shadow-primary/20"
-            onClick={() => setHasCompletedCourse(true)}
+            onClick={() => {
+              setHasCompletedCourse(true);
+              if (selectedCourseId) {
+                setCourseStatus(selectedCourseId, "POST_ASSESSMENT");
+              }
+            }}
             disabled={hasCompletedCourse || loadingOutline || sections.length === 0}
           >
             <div className="absolute inset-0 bg-gradient-to-r from-primary to-primary/80 transition-opacity group-hover:opacity-90" />

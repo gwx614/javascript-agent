@@ -26,7 +26,11 @@ export interface LearningState {
   setSectionContent: (stageId: string, id: string, content: string) => void;
   setLoadingOutline: (stageId: string, loading: boolean) => void;
   setLoadingContent: (stageId: string, loading: boolean) => void;
-  syncData: (stageId: string, sections: LearningSection[], contents: Record<string, string>) => void;
+  syncData: (
+    stageId: string,
+    sections: LearningSection[],
+    contents: Record<string, string>
+  ) => void;
   resetStage: (stageId: string) => void;
   resetAll: () => void;
   getStageState: (stageId: string) => StageState;
@@ -81,7 +85,7 @@ export const useLearningStore = create<LearningState>()(
             [stageId]: {
               ...(state.stageStates[stageId] || createDefaultStageState()),
               sectionContents: {
-                ...((state.stageStates[stageId] || createDefaultStageState()).sectionContents),
+                ...(state.stageStates[stageId] || createDefaultStageState()).sectionContents,
                 [id]: content,
               },
               lastUpdated: Date.now(),
@@ -135,13 +139,13 @@ export const useLearningStore = create<LearningState>()(
       getStageState: (stageId) => {
         const state = get();
         const stageState = state.stageStates[stageId];
-        
+
         // 检查缓存是否过期
-        if (stageState && (Date.now() - stageState.lastUpdated) > CACHE_EXPIRY_TIME) {
+        if (stageState && Date.now() - stageState.lastUpdated > CACHE_EXPIRY_TIME) {
           // 缓存过期，返回默认状态
           return createDefaultStageState();
         }
-        
+
         return stageState || createDefaultStageState();
       },
       preloadStage: (stageId) => {
@@ -153,14 +157,14 @@ export const useLearningStore = create<LearningState>()(
         set((state) => {
           const now = Date.now();
           const newStageStates: Record<string, StageState> = {};
-          
+
           // 只保留未过期的缓存
           Object.entries(state.stageStates).forEach(([stageId, stageState]) => {
-            if ((now - stageState.lastUpdated) <= CACHE_EXPIRY_TIME) {
+            if (now - stageState.lastUpdated <= CACHE_EXPIRY_TIME) {
               newStageStates[stageId] = stageState;
             }
           });
-          
+
           return { stageStates: newStageStates };
         });
       },
@@ -168,9 +172,9 @@ export const useLearningStore = create<LearningState>()(
     {
       name: "learning-store", // 存储名称
       storage: createJSONStorage(() => localStorage), // 使用localStorage存储
-      partialize: (state) => ({ 
+      partialize: (state) => ({
         stageStates: state.stageStates,
-        currentStageId: state.currentStageId 
+        currentStageId: state.currentStageId,
       }), // 只存储必要的数据
     }
   )

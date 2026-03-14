@@ -14,6 +14,8 @@ export interface UserState {
   _hasHydrated: boolean;
   // 阶段特定的评估状态: courseId -> boolean
   stageAssessed: Record<string, boolean>;
+  // 阶段特定的原始状态枚举: courseId -> status string
+  courseStatus: Record<string, string>;
   login: (user: UserProfile) => void;
   logout: () => void;
   updateUser: (updates: Partial<UserProfile>) => void;
@@ -25,6 +27,7 @@ export interface UserState {
   setHasHydrated: (state: boolean) => void;
   // 阶段特定的评估状态管理
   setStageAssessed: (courseId: string, assessed: boolean) => void;
+  setCourseStatus: (courseId: string, status: string) => void;
   isStageAssessed: (courseId: string | null) => boolean;
   // 用于一键同步后台状态
   syncWithBackend: (courseId: string, data: any) => void;
@@ -42,6 +45,7 @@ export const useUserStore = create<UserState>()(
       finalReport: null,
       _hasHydrated: false,
       stageAssessed: {},
+      courseStatus: {},
       login: (user) => set({ user, isAuthenticated: true }),
       logout: () => {
         // 清空学习数据缓存，防止多用户串台泄露
@@ -55,6 +59,7 @@ export const useUserStore = create<UserState>()(
           hasCompletedCourse: false,
           finalReport: null,
           stageAssessed: {},
+          courseStatus: {},
         });
       },
       updateUser: (updates) =>
@@ -86,6 +91,13 @@ export const useUserStore = create<UserState>()(
         if (!courseId) return false;
         return get().stageAssessed[courseId] || false;
       },
+      setCourseStatus: (courseId, status) =>
+        set((state) => ({
+          courseStatus: {
+            ...state.courseStatus,
+            [courseId]: status,
+          },
+        })),
       syncWithBackend: (courseId, data) => {
         if (!data || !courseId) return;
         // 根据后端状态判断该阶段是否已完成摸底流程并进入了学习区
@@ -101,6 +113,10 @@ export const useUserStore = create<UserState>()(
           diagnosisReport: data.preReport,
           hasCompletedCourse: ["POST_ASSESSMENT", "POST_REPORT", "COMPLETED"].includes(data.status),
           finalReport: data.postReport,
+          courseStatus: {
+            ...get().courseStatus,
+            [courseId]: data.status,
+          },
         });
       },
     }),

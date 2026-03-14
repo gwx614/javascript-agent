@@ -7,7 +7,7 @@ import { useLearningOutline } from "@/hooks/useLearningOutline";
 import { cn } from "@/lib/utils";
 import { AiAssistant } from "@/components/chat";
 import { Loader2 } from "lucide-react";
-import { LearningProfileModal } from "@/components/LearningProfileModal";
+import { LearningProfileModal } from "@/components/learning/LearningProfileModal";
 import { LearningSidebar } from "@/components/learning/LearningSidebar";
 import { LearningContent } from "@/components/learning/LearningContent";
 import { AssessmentForm } from "@/components/learning/AssessmentForm";

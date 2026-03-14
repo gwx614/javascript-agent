@@ -1,5 +1,6 @@
 import { JS_LEARNING_SYSTEM_PROMPT, DEFAULT_MODEL, getAIApiKey, AI_API_URL } from "@/lib/ai";
 import { getPrisma } from "@/lib/prisma";
+import { ragGenerate } from "@/lib/rag";
 import type { ChatMessagePayload } from "@/types";
 
 /**
@@ -50,13 +51,33 @@ export async function POST(req: Request) {
       });
 
     // 注入角色的系统提示词
-    const dynamicSystemPrompt = user?.rolePosition
+    const baseSystemPrompt = user?.rolePosition
       ? `${JS_LEARNING_SYSTEM_PROMPT}\n\n当前用户的专属角色定位是：【${user.rolePosition}】。请你在接下来的所有回复中，严格保持这个角色定位对应的口吻、辅导方式和交流深度。`
       : JS_LEARNING_SYSTEM_PROMPT;
 
+    // 使用 RAG 增强生成
+    // 获取最后一个用户消息用于 RAG 检索
+    const lastUserMessage = [...coreMessages].reverse().find((m) => m.role === "user");
+    const userMessage = lastUserMessage?.content || "";
+    let enhancedSystemPrompt = baseSystemPrompt;
+
+    try {
+      // 只有当用户消息不为空时才使用 RAG
+      if (userMessage && userMessage.trim()) {
+        const ragContext = await ragGenerate(userMessage, []);
+
+        if (ragContext && ragContext !== userMessage) {
+          enhancedSystemPrompt = `${baseSystemPrompt}\n\n${ragContext}`;
+        }
+      }
+    } catch (error) {
+      console.error("RAG 增强失败，使用基础提示词:", error);
+    }
+
+    // 构建请求体
     const requestBody = {
       model: DEFAULT_MODEL,
-      messages: [{ role: "system", content: dynamicSystemPrompt }, ...coreMessages],
+      messages: [{ role: "system", content: enhancedSystemPrompt }, ...coreMessages],
       temperature: 0.7,
       max_tokens: 2048,
       stream: true,

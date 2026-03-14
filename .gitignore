@@ -1,7 +1,21 @@
-// 记录 prettier 忽略的文件和目录
+# 忽略构建产物和依赖
 .next
 node_modules
 dist
+
+# 忽略环境变量文件
 .env.local
 .env
+
+# 忽略数据库文件
+*.db
+
+# 忽略构建缓存
+tsconfig.tsbuildinfo
+
+# 忽略测试脚本
 tests
+
+# 忽略知识库原始文档和 RAG 向量数据库
+knowledge/
+data/

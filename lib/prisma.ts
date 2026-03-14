@@ -11,9 +11,9 @@ export const getPrisma = () => {
 
   try {
     const client = new PrismaClient({
-      log: ["query", "error", "warn"]
+      log: ["query", "error", "warn"],
     });
-    
+
     if (process.env.NODE_ENV !== "production") {
       globalForPrisma.prisma = client;
     }

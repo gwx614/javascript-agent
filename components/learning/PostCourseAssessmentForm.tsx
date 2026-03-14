@@ -133,6 +133,9 @@ export function PostCourseAssessmentForm({
       } else if (data.report) {
         setLocalReport(data.report);
         setFinalReport(data.report);
+        if (selectedCourseId) {
+          useUserStore.getState().setCourseStatus(selectedCourseId, "POST_REPORT");
+        }
       }
     } catch (err) {
       alert("生成报告失败，请重试。");

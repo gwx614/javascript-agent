@@ -6,10 +6,7 @@ export async function POST(req: Request) {
     const { username, password } = await req.json();
 
     if (!username || !password) {
-      return NextResponse.json(
-        { error: "请输入用户名和密码" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "请输入用户名和密码" }, { status: 400 });
     }
 
     // 获取 prisma 实例
@@ -21,18 +18,12 @@ export async function POST(req: Request) {
     });
 
     if (!user) {
-      return NextResponse.json(
-        { error: "该账号未注册，请先注册" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "该账号未注册，请先注册" }, { status: 400 });
     }
 
     // 验证密码 (明文比对)
     if (user.password !== password) {
-      return NextResponse.json(
-        { error: "密码错误" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "密码错误" }, { status: 400 });
     }
 
     return NextResponse.json(
@@ -42,9 +33,9 @@ export async function POST(req: Request) {
   } catch (error: any) {
     console.error("Login error details:", error);
     return NextResponse.json(
-      { 
+      {
         error: "服务器内部错误，请稍后重试",
-        details: error.message || String(error)
+        details: error.message || String(error),
       },
       { status: 500 }
     );
