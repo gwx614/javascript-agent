@@ -10,3 +10,5 @@ export {
   getOrCreateCollection,
   VECTOR_COLLECTION_NAME,
 } from "./vector-db-sqlite";
+
+export type { VectorDocument, QueryResult } from "./vector-db-sqlite";

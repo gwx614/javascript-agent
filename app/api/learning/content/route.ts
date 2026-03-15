@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { getPrisma } from "@/lib/prisma";
 import { streamAI } from "@/lib/ai";
-import { STAGES } from "@/lib/courseConfig";
+import { STAGES } from "@/lib/config";
+import { retrieveRelevantDocuments } from "@/lib/rag";
 import type { KnowledgePointStatus } from "@/types";
 
 const prisma = getPrisma();
@@ -124,7 +125,37 @@ export async function POST(req: Request) {
       }
     }
 
-    // 4. 三次迭代：通俗易懂的学霸笔记版 Prompt
+    // 4. 使用RAG检索相关知识库内容
+    console.log(`\n🔍 为学习内容生成检索相关知识: "${sectionTitle}"`);
+    const relevantDocs = await retrieveRelevantDocuments(sectionTitle, {
+      topK: 3,
+      maxContextLength: 6000,
+    });
+
+    // 构建知识库上下文
+    let knowledgeContext = "";
+    if (relevantDocs.length > 0) {
+      const docsContent = relevantDocs
+        .map(
+          (doc, index) =>
+            `## 参考资料 ${index + 1}: ${doc.metadata?.title || "技术文档"}\n${doc.content}`
+        )
+        .join("\n\n");
+
+      knowledgeContext = `
+# 知识库参考 (权威技术文档)
+以下是从权威技术文档中检索到的相关内容，请结合这些内容生成教程：
+
+${docsContent}
+
+**重要提示**：在生成教程时，请优先参考以上权威技术文档的内容，确保技术准确性。可以结合文档中的示例和解释，但要转化为通俗易懂的教学语言。
+`;
+      console.log(`✅ 成功检索到 ${relevantDocs.length} 个相关文档`);
+    } else {
+      console.log("⚠️  未找到相关文档，将基于通用知识生成");
+    }
+
+    // 5. 三次迭代：通俗易懂的学霸笔记版 Prompt
     const systemPrompt = `你是一个讲课极其生动、图文并茂的技术大牛。你正在为用户编写【${courseTitle}】课程中【${sectionTitle}】的学习笔记。
 
 # 教学大纲预设要求 (核心指令)
@@ -135,22 +166,31 @@ export async function POST(req: Request) {
 - 职业定位: ${user.roleReport || "前端开发"}
 - 基础水平: ${skillLevel}
 - 学习策略: ${sectionStatus || "learn"}
+- 职业身份: ${user.careerIdentity || "未知"}
+- 编程经验: ${user.experienceLevel || "未知"}
+- 学习目标: ${user.learningGoal || "未知"}
+- 兴趣领域: ${Array.isArray(user.interestAreas) ? user.interestAreas.join("、") : typeof user.interestAreas === "string" ? user.interestAreas : "未知"}
+- 目标水平: ${user.targetLevel || "未知"}
+- 补充说明: ${user.additionalNotes || "无"}
 
 ${depthInstruction}
 ${diagnosisContext}
+${knowledgeContext}
 
 # 生成规范 (最高优先级)
-
-1. **“学霸笔记”风格体裁**：文章必须像一份精心整理的、图文并茂的复习笔记。语言要通俗接地气，千万不要像机器翻译的官方文档。采用清晰的层级（如：一、大白话解剖，二、核心对比，三、真实业务演示）。
-2. **生动开场与类比**：在解释任何抽象语法前，**必须先用一个极度生活化的通俗比喻**（例如：把Promise比作取餐盘，把闭包比作自带干粮的背包客）来铺垫。
-3. **图解辅助思维**：不要用干巴巴的文字！凡是涉及到“原理”、“对比”、“状态转移”、“内存流转”的东西，**必须优先输出 Markdown 表格或 ASCII 排版图解**。
-4. **【核心约束】克制的微代码**：
+1. 这是用户喜欢的导师风格: ${user.tutorStyle || "未知"}，请以该风格生成文章内容
+2. **“学霸笔记”风格体裁**：文章必须像一份精心整理的、图文并茂的复习笔记。语言要通俗接地气，千万不要像机器翻译的官方文档。采用清晰的层级（如：一、大白话解剖，二、核心对比，三、真实业务演示）。
+3. **生动开场与类比**：在解释任何抽象语法前，**必须先用一个极度生活化的通俗比喻**来铺垫。
+4. **图解辅助思维**：不要用干巴巴的文字！凡是涉及到“原理”、“对比”、“状态转移”、“内存流转”的东西，**必须优先输出 Markdown 表格或 ASCII 排版图解**。
+5. **【核心约束】克制的微代码**：
    - 最长的演示代码块**绝对禁止超过 15 行**！
    - 写代码只写“最硬核的增量逻辑”，去掉假数据和 \`console.log\` 刷屏。
-   - 所有变量名必须带着浓厚的【职业定位】风味（如电商用 \`checkoutStatus\`，不准用 \`demo/test\`）。
-5. **画龙点睛的排版**：不允许使用任何Emoji（如 📌、💡、⚠️）。
+   - 所有变量名必须带着浓厚的【职业定位】风味。
+6. **画龙点睛的排版**：不允许使用任何Emoji（如 📌、💡、⚠️）。
+7. 一定要结合用户的职业定位和学习目标，生成符合对方需求的学习内容。
+8. 这是用户偏好的学习场景（设计需要场景的的内容时优先考虑）: ${Array.isArray(user.preferredScenarios) ? user.preferredScenarios.join("、") : typeof user.preferredScenarios === "string" ? user.preferredScenarios : "未知"}
 
-一句话核心诉求：用最说人话的类比、最一目了然的图表框架，以及贴合对方职业方向的微代码，生成一篇阅读体验极佳的“高维降维学习笔记”。请直接输出纯 Markdown。`;
+一句话核心诉求：用最说人话的类比、最一目了然的内容框架，以及贴合对方技术水平、职业方向的微代码，生成一篇阅读体验极佳、内容丰富完善的“高维降维学习笔记”。请直接输出纯 Markdown。`;
 
     const stream = await streamAI({
       messages: [

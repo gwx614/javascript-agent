@@ -4,6 +4,9 @@
   "type": "module",
   "private": true,
   "scripts": {
+    "knowledge:check": "node scripts/clean-knowledge.mjs",
+    "knowledge:fix": "node scripts/clean-knowledge.mjs --fix",
+    "knowledge:report": "node scripts/clean-knowledge.mjs --report",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",

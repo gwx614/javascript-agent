@@ -27,7 +27,24 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json(
-      { message: "登录成功", user: { username: user.username } },
+      {
+        message: "登录成功",
+        user: {
+          username: user.username,
+          rolePosition: user.rolePosition,
+          roleReport: user.roleReport,
+          skillLevel: user.skillLevel,
+          careerIdentity: user.careerIdentity,
+          experienceLevel: user.experienceLevel,
+          learningGoal: user.learningGoal,
+          interestAreas: user.interestAreas,
+          preferredScenarios: user.preferredScenarios,
+          targetLevel: user.targetLevel,
+          tutorStyle: user.tutorStyle,
+          weeklyStudyTime: user.weeklyStudyTime,
+          additionalNotes: user.additionalNotes,
+        },
+      },
       { status: 200 }
     );
   } catch (error: any) {

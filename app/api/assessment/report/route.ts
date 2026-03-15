@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getPrisma } from "@/lib/prisma";
 import { callAI } from "@/lib/ai";
-import { STAGES } from "@/lib/courseConfig";
+import { STAGES } from "@/lib/config";
 import type { AssessmentQuestion } from "@/types";
 
 const prisma = getPrisma();
@@ -66,6 +66,15 @@ export async function POST(req: Request) {
 - **Score (0-100)**: 这是一个综合得分。不仅看对错，还要评估思维模式是否符合该职业角色的期望。
 - **Levels**: 针对核心知识点 (${coreKnowledge.join("、")}) 分别给出评级。
 
+## 用户画像参考
+- 职业身份：${user.careerIdentity || "未知"}
+- 编程经验：${user.experienceLevel || "未知"}
+- 学习目标：${user.learningGoal || "未知"}
+- 兴趣领域：${Array.isArray(user.interestAreas) ? user.interestAreas.join("、") : typeof user.interestAreas === "string" ? user.interestAreas : "未知"}
+- 偏好场景：${Array.isArray(user.preferredScenarios) ? user.preferredScenarios.join("、") : typeof user.preferredScenarios === "string" ? user.preferredScenarios : "未知"}
+- 目标水平：${user.targetLevel || "未知"}
+- 补充说明：${user.additionalNotes || "无"}
+
 ## 后续建议逻辑 (Important!)
 - **Score < 70**: 强烈建议**重新开始**本阶段学习，夯实基础。
 - **70 <= Score < 85**: 建议进行针对性的**查漏补缺**，然后考虑下一阶段。
@@ -74,8 +83,8 @@ export async function POST(req: Request) {
 ## 输出要求
 严格遵守且仅输出以下 JSON 结构：
 {
-  "totalScore": 88,
-  "levelLabel": "进阶阶段熟练",
+  "totalScore": 88(根据用户实际表现评分),
+  "levelLabel": "进阶阶段熟练(根据用户实际表现评级)",
   "summary": "一句高度凝练、带有鼓励性和专业洞察的评价。",
   "detailedAnalysis": "200字左右的综合分析，涵盖进步、薄弱项、思维模式评价。",
   "knowledgeMastery": [
@@ -92,7 +101,9 @@ export async function POST(req: Request) {
   }
 }
 
-仅输出 JSON，不要带标记。`;
+仅输出 JSON，不要带标记。
+绝对禁止输出任何 markdown 标记、解释文字、注释或 emoji 表情。
+只输出纯 JSON 字符串，能被 JSON.parse() 直接解析。`;
 
     let content = await callAI({
       messages: [

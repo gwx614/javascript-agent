@@ -3,21 +3,8 @@
 import { useState, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import {
-  Loader2,
-  ArrowRight,
-  CheckCircle2,
-  Target,
-  BrainCircuit,
-  Clock,
-  Layout,
-  Code2,
-  AlertCircle,
-  Briefcase,
-  Sparkles,
-  Save,
-} from "lucide-react";
-import { formQuestions, defaultFormData } from "@/lib/onboardingConfig";
+import { Loader2, ArrowRight, BrainCircuit, Sparkles } from "lucide-react";
+import { formQuestions, defaultFormData } from "@/lib/config";
 import { Question } from "@/types";
 import { CourseSelection } from "./CourseSelection";
 import { useUserStore } from "@/store/useUserStore";
@@ -55,7 +42,6 @@ export function LearningProfileModal({ mode, onComplete, onClose }: LearningProf
 
   const user = useUserStore((state) => state.user);
   const updateUser = useUserStore((state) => state.updateUser);
-  const setOnboarded = useUserStore((state) => state.setOnboarded);
 
   useEffect(() => {
     const saved = localStorage.getItem("learningProfile");
@@ -84,39 +70,6 @@ export function LearningProfileModal({ mode, onComplete, onClose }: LearningProf
 
   const handleNext = () => setStep(step + 1);
 
-  const handleSkipAI = () => {
-    setOnboarded(true);
-    setStep(4);
-  };
-
-  const handleSaveSettings = async () => {
-    localStorage.setItem("learningProfile", JSON.stringify(formData));
-
-    // Also try saving to DB if user is logged in
-    if (user?.username) {
-      try {
-        await fetch("/api/user/profile", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            username: user.username,
-            rolePosition: roleName,
-            formData,
-          }),
-        });
-
-        // Update user store
-        updateUser({
-          rolePosition: roleName,
-        });
-      } catch (e) {
-        console.error("Failed to save profile to DB", e);
-      }
-    }
-
-    if (onClose) onClose();
-  };
-
   const handleGenerateRole = async () => {
     setLoading(true);
     setStep(3);
@@ -124,6 +77,8 @@ export function LearningProfileModal({ mode, onComplete, onClose }: LearningProf
     localStorage.setItem("learningProfile", JSON.stringify(formData));
 
     try {
+      console.log("[Onboarding] 开始调用 /api/onboarding，发送问卷数据:", formData);
+
       const res = await fetch("/api/onboarding", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -136,6 +91,8 @@ export function LearningProfileModal({ mode, onComplete, onClose }: LearningProf
         ),
       });
       const data = await res.json();
+      console.log("[Onboarding] /api/onboarding 返回数据:", data);
+
       if (data.report) {
         setReport(data.report);
         // Try to extract a short role name from the report if provided in a specific format, otherwise use a default
@@ -146,14 +103,11 @@ export function LearningProfileModal({ mode, onComplete, onClose }: LearningProf
         // Save to Database
         if (user?.username) {
           try {
-            // 从第一题的答案映射 skillLevel
-            const levelAnswer = String((formData as any)[1] || "");
-            let skillLevel = "beginner";
-            if (levelAnswer.startsWith("有一定基础")) {
-              skillLevel = "intermediate";
-            } else if (levelAnswer.startsWith("基础较好")) {
-              skillLevel = "advanced";
-            }
+            // 从 API 返回的 profile 数据中提取用户画像信息
+            const profile = data.profile || {};
+
+            console.log("[Onboarding] 开始保存用户画像到数据库，用户名:", user.username);
+            console.log("[Onboarding] 保存的 profile 数据:", profile);
 
             const saveRes = await fetch("/api/user/profile", {
               method: "POST",
@@ -162,17 +116,29 @@ export function LearningProfileModal({ mode, onComplete, onClose }: LearningProf
                 username: user.username,
                 rolePosition: extractedRole,
                 roleReport: data.report,
-                skillLevel,
-                formData,
+                skillLevel: profile.skillLevel || "beginner",
+                // 新增用户画像字段
+                careerIdentity: profile.careerIdentity,
+                experienceLevel: profile.experienceLevel,
+                learningGoal: profile.learningGoal,
+                interestAreas: profile.interestAreas,
+                preferredScenarios: profile.preferredScenarios,
+                targetLevel: profile.targetLevel,
+                tutorStyle: profile.tutorStyle,
+                weeklyStudyTime: profile.weeklyStudyTime,
+                additionalNotes: profile.additionalNotes,
+                surveyData: profile.surveyData,
               }),
             });
             const saveData = await saveRes.json();
+            console.log("[Onboarding] 数据库保存结果:", saveData);
+
             if (saveData.success) {
               // Update Zustand User Store
               updateUser({
                 rolePosition: extractedRole,
                 roleReport: data.report,
-                skillLevel,
+                skillLevel: profile.skillLevel || "beginner",
               });
             }
           } catch (e) {
@@ -191,31 +157,27 @@ export function LearningProfileModal({ mode, onComplete, onClose }: LearningProf
     }
   };
 
-  const icons = {
-    level: <BrainCircuit className="h-4 w-4 text-blue-500" />,
-    goal: <Target className="h-4 w-4 text-purple-500" />,
-    time: <Clock className="h-4 w-4 text-orange-500" />,
-    style: <Layout className="h-4 w-4 text-emerald-500" />,
-    html: <Code2 className="h-4 w-4 text-cyan-500" />,
-    struggle: <AlertCircle className="h-4 w-4 text-red-500" />,
-    career: <Briefcase className="h-4 w-4 text-indigo-500" />,
-  };
-
   const renderField = (field: Question) => {
     const value = (formData as any)[field.id];
 
     if (field.type === "select") {
+      // 确保 value 是标量值（字符串）
+      const safeValue = typeof value === "string" ? value : undefined;
       return (
         <Select
-          value={value}
+          value={safeValue}
           onValueChange={(val) => setFormData({ ...formData, [field.id]: val })}
         >
-          <SelectTrigger className="h-12 rounded-lg border-none bg-muted/30 transition-colors hover:bg-muted/50 focus:ring-2 focus:ring-primary/20">
+          <SelectTrigger className="h-12 rounded-lg border border-border/30 bg-muted/40 text-base font-medium text-foreground transition-colors hover:bg-muted/60 focus:ring-2 focus:ring-primary/20">
             <SelectValue placeholder="请选择..." />
           </SelectTrigger>
-          <SelectContent className="rounded-lg border-none shadow-xl">
+          <SelectContent className="rounded-lg border border-border/30 shadow-xl">
             {(field.options || []).map((opt) => (
-              <SelectItem key={opt} value={opt} className="cursor-pointer rounded-md">
+              <SelectItem
+                key={opt}
+                value={opt}
+                className="cursor-pointer rounded-md text-base font-medium"
+              >
                 {opt}
               </SelectItem>
             ))}
@@ -227,7 +189,7 @@ export function LearningProfileModal({ mode, onComplete, onClose }: LearningProf
     if (field.type === "textarea") {
       return (
         <textarea
-          className="min-h-[100px] w-full resize-none rounded-lg border-none bg-muted/30 p-4 text-sm outline-none transition-colors hover:bg-muted/50 focus:ring-2 focus:ring-primary/20"
+          className="min-h-[100px] w-full resize-none rounded-lg border border-border/30 bg-muted/40 p-4 text-base font-medium text-foreground outline-none transition-colors placeholder:text-muted-foreground/60 hover:bg-muted/60 focus:ring-2 focus:ring-primary/20"
           placeholder={field.placeholder || "请输入..."}
           value={value}
           onChange={(e) => setFormData({ ...formData, [field.id]: e.target.value })}
@@ -243,11 +205,11 @@ export function LearningProfileModal({ mode, onComplete, onClose }: LearningProf
             return (
               <label
                 key={opt}
-                className="flex cursor-pointer items-center gap-3 rounded-lg bg-muted/20 p-3 transition-colors hover:bg-muted/40"
+                className="flex cursor-pointer items-center gap-3 rounded-lg border border-border/20 bg-muted/30 p-4 transition-colors hover:bg-muted/50"
               >
                 <input
                   type="checkbox"
-                  className="h-5 w-5 rounded-sm border-muted bg-background text-primary focus:ring-primary/20"
+                  className="h-5 w-5 rounded-sm border-border/50 bg-background text-primary focus:ring-primary/20"
                   checked={isChecked}
                   onChange={(e) => {
                     const newValues = e.target.checked
@@ -258,7 +220,7 @@ export function LearningProfileModal({ mode, onComplete, onClose }: LearningProf
                     setFormData({ ...formData, [field.id]: newValues });
                   }}
                 />
-                <span className="text-sm font-medium">{opt}</span>
+                <span className="text-base font-medium text-foreground">{opt}</span>
               </label>
             );
           })}
@@ -314,31 +276,31 @@ export function LearningProfileModal({ mode, onComplete, onClose }: LearningProf
               <DialogTitle className="text-2xl font-black tracking-tight">
                 个性化你的学习
               </DialogTitle>
-              <DialogDescription className="text-base">
+              <DialogDescription className="text-base text-foreground/70">
                 填写这些信息，AI 将构建专属于你的学习角色（3-5分钟）。
               </DialogDescription>
             </DialogHeader>
 
             <ScrollArea className="flex-1 px-8">
-              <div className="space-y-8 pb-8">
+              <div className="space-y-6 pb-8">
                 {formQuestions.map((field, index) => (
                   <div
                     key={field.id}
-                    className="group space-y-3 rounded-xl border border-border/10 bg-card p-5 shadow-sm"
+                    className="group space-y-3 rounded-xl border border-border/30 bg-card p-6 shadow-sm"
                   >
-                    <label className="flex items-start gap-2 text-base font-bold leading-relaxed transition-colors group-hover:text-primary">
-                      <span className="mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs text-primary">
+                    <label className="flex items-start gap-3 text-base font-bold leading-relaxed text-foreground transition-colors group-hover:text-primary">
+                      <span className="mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-primary/15 text-sm font-bold text-primary">
                         {index + 1}
                       </span>
                       <span>{field.question}</span>
                     </label>
-                    <div className="pl-8 pt-1">{renderField(field)}</div>
+                    <div className="pl-10 pt-1">{renderField(field)}</div>
                   </div>
                 ))}
               </div>
             </ScrollArea>
 
-            <div className="flex justify-end gap-3 rounded-b-2xl border-t bg-muted/5 p-8 pt-4">
+            <div className="flex justify-end gap-3 rounded-b-2xl border-t border-border/30 bg-card/50 p-8 pt-4">
               {mode === "settings" ? (
                 <>
                   <Button

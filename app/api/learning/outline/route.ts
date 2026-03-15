@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getPrisma } from "@/lib/prisma";
 import { callAI } from "@/lib/ai";
-import { STAGES } from "@/lib/courseConfig";
+import { STAGES } from "@/lib/config";
 import type { KnowledgePointStatus } from "@/types";
 
 const prisma = getPrisma();
@@ -108,6 +108,22 @@ ${user.roleReport || "无"}
 ${user.skillLevel || "beginner"}
 水平说明：
 - beginner: 初学者；intermediate: 有一定经验；advanced: 有丰富项目经验
+职业身份：
+${user.careerIdentity || "未知"}
+编程经验：
+${user.experienceLevel || "未知"}
+学习目标：
+${user.learningGoal || "未知"}
+兴趣领域：
+${Array.isArray(user.interestAreas) ? user.interestAreas.join("、") : typeof user.interestAreas === "string" ? user.interestAreas : "未知"}
+偏好场景：
+${Array.isArray(user.preferredScenarios) ? user.preferredScenarios.join("、") : typeof user.preferredScenarios === "string" ? user.preferredScenarios : "未知"}
+目标水平：
+${user.targetLevel || "未知"}
+每周学习时间：
+${user.weeklyStudyTime || "未知"}
+补充说明：
+${user.additionalNotes || "无"}
 --------------------------------------------------
 # 诊断参考信息（辅助标注重点和教学方向）
 ${diagRef}
@@ -193,13 +209,16 @@ JSON结构必须完全符合：
 --------------------------------------------------
 # 输出前检查
 在输出之前请确认：
-1 小节数量 = 核心知识点数量  
-2 小节顺序与知识点顺序完全一致  
-3 status 只使用 learn / reinforce / skip  
-4 description ≤ 100 字  
-5 JSON 格式合法可解析  
-只输出 JSON。
-`;
+1. 小节数量 = 核心知识点数量
+2. 小节顺序与知识点顺序完全一致
+3. status 只使用 learn / reinforce / skip
+4. description ≤ 100 字
+5. JSON 格式合法可解析
+6. 绝对禁止输出任何 markdown 标记（如 \`\`\`json ）
+7. 绝对禁止输出任何解释文字或注释
+8. 绝对禁止输出任何 emoji 表情
+9. 只输出纯 JSON 数组，能被 JSON.parse() 直接解析
+只输出 JSON。`;
 
     let content = await callAI({
       messages: [
@@ -212,6 +231,7 @@ JSON结构必须完全符合：
       label: "Outline",
     });
     console.log(systemPrompt);
+    console.log("AI Response:", content);
 
     content = content
       .replace(/```json/g, "")

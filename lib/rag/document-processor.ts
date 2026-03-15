@@ -104,7 +104,7 @@ export async function parseMarkdownFile(filePath: string): Promise<ProcessedDocu
  */
 export function chunkDocument(content: string, chunkSize: number = 1000): string[] {
   const chunks: string[] = [];
-  const MAX_CHUNK_SIZE = 8000; // 嵌入API限制为8192，留一些余量
+  const MAX_CHUNK_SIZE = chunkSize * 1.5; // 最大块大小为chunkSize的1.5倍，留一些余量
 
   // 先按段落分割
   const paragraphs = content.split(/\n\n+/).filter((p) => p.trim().length > 0);
@@ -126,7 +126,7 @@ export function chunkDocument(content: string, chunkSize: number = 1000): string
       for (const sentence of sentences) {
         const sentenceWithPunctuation = sentence + "。";
 
-        if (tempChunk.length + sentenceWithPunctuation.length <= MAX_CHUNK_SIZE) {
+        if (tempChunk.length + sentenceWithPunctuation.length <= chunkSize) {
           tempChunk += sentenceWithPunctuation;
         } else {
           if (tempChunk.length > 0) {
@@ -158,8 +158,8 @@ export function chunkDocument(content: string, chunkSize: number = 1000): string
   for (const chunk of chunks) {
     if (chunk.length > MAX_CHUNK_SIZE) {
       // 强制分割
-      for (let i = 0; i < chunk.length; i += MAX_CHUNK_SIZE) {
-        finalChunks.push(chunk.slice(i, i + MAX_CHUNK_SIZE));
+      for (let i = 0; i < chunk.length; i += chunkSize) {
+        finalChunks.push(chunk.slice(i, i + chunkSize));
       }
     } else {
       finalChunks.push(chunk);

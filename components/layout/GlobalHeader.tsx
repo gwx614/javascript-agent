@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/select";
 import { useUserStore } from "@/store/useUserStore";
 import { useLearningStore } from "@/store/useLearningStore";
-import { STAGES } from "@/lib/courseConfig";
+import { STAGES } from "@/lib/config";
 
 export function GlobalHeader() {
   const router = useRouter();

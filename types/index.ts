@@ -10,6 +10,19 @@ export interface UserProfile {
   username?: string;
   rolePosition?: string;
   roleReport?: string;
+
+  // 用户画像字段
+  careerIdentity?: string;
+  experienceLevel?: string;
+  learningGoal?: string;
+  interestAreas?: string[];
+  preferredScenarios?: string[];
+  targetLevel?: string;
+  tutorStyle?: string;
+  weeklyStudyTime?: string;
+  additionalNotes?: string;
+  surveyData?: Record<string, any>;
+
   [key: string]: any;
 }
 

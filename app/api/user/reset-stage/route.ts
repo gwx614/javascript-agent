@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getPrisma } from "@/lib/prisma";
-import { apiError } from "@/lib/apiError";
+import { apiError } from "@/lib/utils";
 
 /**
  * 重置用户在特定阶段的学习状态

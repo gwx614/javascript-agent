@@ -1,5 +1,4 @@
 import { JS_LEARNING_SYSTEM_PROMPT, DEFAULT_MODEL, getAIApiKey, AI_API_URL } from "@/lib/ai";
-import { getPrisma } from "@/lib/prisma";
 import { ragGenerate } from "@/lib/rag";
 import type { ChatMessagePayload } from "@/types";
 
@@ -51,9 +50,25 @@ export async function POST(req: Request) {
       });
 
     // 注入角色的系统提示词
-    const baseSystemPrompt = user?.rolePosition
+    let baseSystemPrompt = user?.rolePosition
       ? `${JS_LEARNING_SYSTEM_PROMPT}\n\n当前用户的专属角色定位是：【${user.rolePosition}】。请你在接下来的所有回复中，严格保持这个角色定位对应的口吻、辅导方式和交流深度。`
       : JS_LEARNING_SYSTEM_PROMPT;
+
+    // 添加用户画像信息
+    if (user) {
+      const userProfileInfo = `\n\n# 用户画像信息
+- 职业身份: ${user.careerIdentity || "未知"}
+- 编程经验: ${user.experienceLevel || "未知"}
+- 学习目标: ${user.learningGoal || "未知"}
+- 兴趣领域: ${Array.isArray(user.interestAreas) ? user.interestAreas.join("、") : typeof user.interestAreas === "string" ? user.interestAreas : "未知"}
+- 偏好场景: ${Array.isArray(user.preferredScenarios) ? user.preferredScenarios.join("、") : typeof user.preferredScenarios === "string" ? user.preferredScenarios : "未知"}
+- 目标水平: ${user.targetLevel || "未知"}
+- 导师风格: ${user.tutorStyle || "未知"}
+- 每周学习时间: ${user.weeklyStudyTime || "未知"}
+- 补充说明: ${user.additionalNotes || "无"}`;
+
+      baseSystemPrompt += userProfileInfo;
+    }
 
     // 使用 RAG 增强生成
     // 获取最后一个用户消息用于 RAG 检索
@@ -101,8 +116,6 @@ export async function POST(req: Request) {
     const encoder = new TextEncoder();
     const decoder = new TextDecoder();
     let messageId = crypto.randomUUID();
-
-    const prisma = getPrisma();
 
     const stream = new ReadableStream({
       async start(controller) {

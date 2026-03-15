@@ -1,17 +1,107 @@
 import { callAI } from "@/lib/ai";
+import { OnboardingSurveyItem } from "@/types";
+
+interface SurveyData {
+  id: string | number;
+  question: string;
+  answer: string | string[];
+}
+
+interface ExtractedProfile {
+  skillLevel: string;
+  careerIdentity: string;
+  experienceLevel: string;
+  learningGoal: string;
+  interestAreas: string[];
+  preferredScenarios: string[];
+  targetLevel: string;
+  tutorStyle: string;
+  weeklyStudyTime: string;
+  additionalNotes: string;
+}
+
+/**
+ * 从问卷数据中提取结构化用户画像
+ */
+function extractProfileFromSurvey(data: SurveyData[]): ExtractedProfile {
+  const profile: ExtractedProfile = {
+    skillLevel: "",
+    careerIdentity: "",
+    experienceLevel: "",
+    learningGoal: "",
+    interestAreas: [],
+    preferredScenarios: [],
+    targetLevel: "",
+    tutorStyle: "",
+    weeklyStudyTime: "",
+    additionalNotes: "",
+  };
+
+  // 问题ID映射到字段名
+  const fieldMapping: Record<number, keyof ExtractedProfile> = {
+    1: "skillLevel",
+    2: "careerIdentity",
+    3: "experienceLevel",
+    4: "learningGoal",
+    5: "interestAreas",
+    6: "preferredScenarios",
+    7: "targetLevel",
+    8: "tutorStyle",
+    9: "weeklyStudyTime",
+    10: "additionalNotes",
+  };
+
+  data.forEach((item) => {
+    const id = typeof item.id === "string" ? parseInt(item.id, 10) : item.id;
+    const fieldName = fieldMapping[id];
+
+    if (fieldName) {
+      if (Array.isArray(item.answer)) {
+        (profile[fieldName] as string[]) = item.answer;
+      } else {
+        (profile[fieldName] as string) = item.answer;
+      }
+    }
+  });
+
+  return profile;
+}
+
+/**
+ * 根据技能水平映射到标准值
+ */
+function mapSkillLevel(answer: string): "beginner" | "intermediate" | "advanced" {
+  if (answer.includes("小白") || answer.includes("从零")) {
+    return "beginner";
+  }
+  if (answer.includes("有一定基础")) {
+    return "intermediate";
+  }
+  if (answer.includes("基础较好") || answer.includes("深入进阶")) {
+    return "advanced";
+  }
+  return "beginner";
+}
 
 export async function POST(req: Request) {
   try {
-    const data = await req.json();
+    const data: SurveyData[] = await req.json();
+
+    // 提取结构化用户画像
+    const extractedProfile = extractProfileFromSurvey(data);
+
+    // 映射技能水平
+    const skillLevel = mapSkillLevel(extractedProfile.skillLevel);
 
     // 组装用户提交的完整问卷数据作为上下文
     const promptContext = data
       .map(
-        (item: { id: string | number; question: string; answer: string | string[] }) =>
+        (item) =>
           `问题${item.id}: ${item.question}\n回答: ${Array.isArray(item.answer) ? item.answer.join("、") : item.answer}`
       )
       .join("\n\n");
-    console.log(promptContext);
+    console.log("[Onboarding] 问卷上下文:", promptContext);
+    console.log("[Onboarding] 提取的用户画像:", extractedProfile);
 
     const systemPrompt = `你是一个资深的 JavaScript 导师。
     根据用户提交的详细学习情况调研问卷，请直接为该用户生成一个准确的【专属角色定位】。
@@ -37,7 +127,23 @@ export async function POST(req: Request) {
         label: "Onboarding",
       })) || "无法生成报告，可能未获取到有效内容。";
 
-    return Response.json({ report: reportText });
+    // 返回角色报告 + 结构化用户画像数据
+    return Response.json({
+      report: reportText,
+      profile: {
+        skillLevel,
+        careerIdentity: extractedProfile.careerIdentity,
+        experienceLevel: extractedProfile.experienceLevel,
+        learningGoal: extractedProfile.learningGoal,
+        interestAreas: extractedProfile.interestAreas,
+        preferredScenarios: extractedProfile.preferredScenarios,
+        targetLevel: extractedProfile.targetLevel,
+        tutorStyle: extractedProfile.tutorStyle,
+        weeklyStudyTime: extractedProfile.weeklyStudyTime,
+        additionalNotes: extractedProfile.additionalNotes,
+        surveyData: data,
+      },
+    });
   } catch (error: any) {
     console.error("Onboarding endpoint error:", error);
     return new Response(JSON.stringify({ error: "分析生成失败，请稍后重试" }), {

@@ -39,6 +39,20 @@ model User {
   rolePosition String? @map("role_position")
   roleReport   String? @map("role_report")
 
+  // 用户画像 - 从问卷中提取的结构化数据
+  careerIdentity    String? @map("career_identity")     // 职业身份 (问题2)
+  experienceLevel   String? @map("experience_level")    // 编程经验 (问题3)
+  learningGoal      String? @map("learning_goal")       // 学习目标 (问题4)
+  interestAreas     String? @map("interest_areas")      // 兴趣领域 JSON数组 (问题5)
+  preferredScenarios String? @map("preferred_scenarios") // 偏好场景 JSON数组 (问题6)
+  targetLevel       String? @map("target_level")        // 目标能力水平 (问题7)
+  tutorStyle        String? @map("tutor_style")         // AI导师风格 (问题8)
+  weeklyStudyTime   String? @map("weekly_study_time")   // 每周学习时间 (问题9)
+  additionalNotes   String? @map("additional_notes")    // 补充说明 (问题10)
+  
+  // 完整的问卷原始数据 (JSON格式)
+  surveyData        String? @map("survey_data")
+
   // 关联
   chatSessions ChatSession[]
   courseStages CourseStage[]

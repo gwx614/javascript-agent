@@ -166,20 +166,20 @@ export function FinalLearningReport({
                 <Button
                   onClick={handleRestart}
                   variant="outline"
-                  className="flex h-16 flex-1 flex-col items-center justify-center gap-1 rounded-2xl border-2 text-base font-bold hover:bg-muted/50"
+                  className="flex h-20 flex-1 flex-col items-center justify-center gap-2 rounded-2xl border-2 border-border/30 bg-background text-lg font-semibold transition-all hover:border-primary/50 hover:bg-primary/5"
                 >
-                  <div className="group flex items-center gap-2 text-muted-foreground">
-                    <RotateCcw className="h-4 w-4 transition-transform group-hover:rotate-[-45deg]" />
+                  <div className="flex items-center gap-2 text-foreground/80">
+                    <RotateCcw className="h-5 w-5 transition-transform hover:rotate-[-45deg]" />
                     <span>重新学习该阶段</span>
                   </div>
-                  <span className="text-[10px] font-medium text-muted-foreground/60">
+                  <span className="text-sm font-medium text-muted-foreground/70">
                     夯实基础，再次挑战
                   </span>
                 </Button>
 
                 <Button
                   onClick={handleNextStep}
-                  className="flex h-16 flex-1 flex-col items-center justify-center gap-1 rounded-2xl text-base font-black shadow-lg shadow-primary/20"
+                  className="flex h-20 flex-1 flex-col items-center justify-center gap-2 rounded-2xl bg-primary text-lg font-bold text-white shadow-lg shadow-primary/30 transition-all hover:scale-[1.02] hover:shadow-xl hover:shadow-primary/40 active:scale-[0.98]"
                 >
                   <div className="flex items-center gap-2">
                     <ArrowRight className="h-5 w-5 animate-pulse" />
@@ -187,9 +187,7 @@ export function FinalLearningReport({
                       {report.recommendation.action === "next" ? "开启下一阶段" : "选择其他课程"}
                     </span>
                   </div>
-                  <span className="text-[10px] font-medium text-muted-foreground/60">
-                    继续学习别的阶段
-                  </span>
+                  <span className="text-sm font-medium text-white/80">继续学习别的阶段</span>
                 </Button>
               </div>
             </div>

@@ -34,6 +34,7 @@ export function PostCourseAssessmentForm({
   const sections = useMemo(() => {
     return selectedCourseId ? stageStates[selectedCourseId]?.sections || [] : [];
   }, [selectedCourseId, stageStates]);
+  const finalReport = useUserStore((state) => state.finalReport);
   const setFinalReport = useUserStore((state) => state.setFinalReport);
 
   const [questions, setQuestions] = useState<AssessmentQuestion[]>([]);
@@ -42,14 +43,12 @@ export function PostCourseAssessmentForm({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // 最终报告（本地视图状态）
-  const [report, setLocalReport] = useState<any | null>(null);
-
   useEffect(() => {
     let ignore = false;
 
     async function loadQuestions() {
-      if (!user?.username) return;
+      // 如果已经有最终报告，不加载问题
+      if (!user?.username || finalReport) return;
       try {
         setLoading(true);
         const res = await fetch("/api/assessment/post-course", {
@@ -86,7 +85,7 @@ export function PostCourseAssessmentForm({
     return () => {
       ignore = true;
     };
-  }, [user, selectedCourseId, diagnosisReport, sections]);
+  }, [user, selectedCourseId, diagnosisReport, sections, finalReport]);
 
   const handleSelectChange = (qId: string, val: string) => {
     setAnswers((prev) => ({ ...prev, [qId]: val }));
@@ -131,7 +130,6 @@ export function PostCourseAssessmentForm({
       if (data.error) {
         alert(data.error);
       } else if (data.report) {
-        setLocalReport(data.report);
         setFinalReport(data.report);
         if (selectedCourseId) {
           useUserStore.getState().setCourseStatus(selectedCourseId, "POST_REPORT");
@@ -144,10 +142,10 @@ export function PostCourseAssessmentForm({
     }
   };
 
-  if (report) {
+  if (finalReport) {
     return (
       <FinalLearningReport
-        report={report}
+        report={finalReport}
         questions={questions}
         onSelectNextCourse={onSelectNextCourse}
       />

@@ -5,12 +5,13 @@
 
 import Database from "better-sqlite3";
 import path from "path";
+import { cosineSimilarity } from "../utils";
 
 // 数据库文件路径
 const DB_PATH = path.join(process.cwd(), "data", "vector-store.db");
 
 // 向量数据接口
-interface VectorDocument {
+export interface VectorDocument {
   id: string;
   content: string;
   embedding: number[];
@@ -18,7 +19,7 @@ interface VectorDocument {
 }
 
 // 查询结果接口
-interface QueryResult {
+export interface QueryResult {
   id: string;
   content: string;
   metadata: Record<string, any>;
@@ -141,7 +142,7 @@ export class SQLiteVectorDB {
     // 计算相似度并排序
     const results: QueryResult[] = rows.map((row) => {
       const embedding = JSON.parse(row.embedding) as number[];
-      const similarity = this.cosineSimilarity(queryEmbedding, embedding);
+      const similarity = cosineSimilarity(queryEmbedding, embedding);
 
       return {
         id: row.id,
@@ -170,31 +171,44 @@ export class SQLiteVectorDB {
   }
 
   /**
-   * 计算余弦相似度
+   * 获取文档
    */
-  private cosineSimilarity(vec1: number[], vec2: number[]): number {
-    if (vec1.length !== vec2.length) {
-      throw new Error("向量长度不匹配");
+  async getDocument(id: string): Promise<QueryResult | null> {
+    if (!this.db) {
+      await this.init();
     }
 
-    let dotProduct = 0;
-    let magnitude1 = 0;
-    let magnitude2 = 0;
+    const stmt = this.db!.prepare(
+      `SELECT id, content, metadata FROM ${this.collectionName} WHERE id = ? LIMIT 1`
+    );
+    const row = stmt.get(id) as
+      | {
+          id: string;
+          content: string;
+          metadata: string;
+        }
+      | undefined;
 
-    for (let i = 0; i < vec1.length; i++) {
-      dotProduct += vec1[i] * vec2[i];
-      magnitude1 += vec1[i] * vec1[i];
-      magnitude2 += vec2[i] * vec2[i];
+    if (!row) return null;
+
+    return {
+      id: row.id,
+      content: row.content,
+      metadata: JSON.parse(row.metadata || "{}"),
+      distance: 0,
+    };
+  }
+
+  /**
+   * 删除文档（按文档ID前缀）
+   */
+  async deleteDocument(documentId: string): Promise<void> {
+    if (!this.db) {
+      await this.init();
     }
 
-    magnitude1 = Math.sqrt(magnitude1);
-    magnitude2 = Math.sqrt(magnitude2);
-
-    if (magnitude1 === 0 || magnitude2 === 0) {
-      return 0;
-    }
-
-    return dotProduct / (magnitude1 * magnitude2);
+    const stmt = this.db!.prepare(`DELETE FROM ${this.collectionName} WHERE id LIKE ?`);
+    stmt.run(`${documentId}%`);
   }
 
   /**

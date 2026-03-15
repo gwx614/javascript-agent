@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getPrisma } from "@/lib/prisma";
 import { callAI } from "@/lib/ai";
-import { STAGES } from "@/lib/courseConfig";
+import { STAGES } from "@/lib/config";
 import type { AssessmentQuestion } from "@/types";
 
 const prisma = getPrisma();
@@ -109,6 +109,11 @@ export async function POST(req: Request) {
 
 ## 出题参考维度
 - **用户角色**: ${user.roleReport || "前端/Node 开发工程师"}
+- **职业身份**: ${user.careerIdentity || "未知"}
+- **编程经验**: ${user.experienceLevel || "未知"}
+- **学习目标**: ${user.learningGoal || "未知"}
+- **目标水平**: ${user.targetLevel || "未知"}
+- **每周学习时间**: ${user.weeklyStudyTime || "未知"}
 - **初始诊断痛点**: ${diagnosisReport?.summary || "无"}
 - **核心覆盖面**: ${courseInfo}
 - **复习线索**: ${sectionsInfo}
@@ -117,6 +122,8 @@ export async function POST(req: Request) {
 1. **职场压迫感 (Role-based Context)**
    - 绝大多数题目的题干必须是以【你正在负责xxx的具体业务】为开头。
    - 例如：而不是问“闭包是什么”，你要问“你正在开发电商系统的购物车组件，遇到以下代码泄漏问题……” 
+   - 用户偏好场景：${Array.isArray(user.preferredScenarios) ? user.preferredScenarios.join("、") : typeof user.preferredScenarios === "string" ? user.preferredScenarios : "未知"}的题目。
+   - 用户兴趣爱好：${Array.isArray(user.interestAreas) ? user.interestAreas.join("、") : typeof user.interestAreas === "string" ? user.interestAreas : "未知"}
 
 2. **微代码鉴错 (Micro-code Debugging)**
    - **题目必须尽可能多地包含代码段 (必须有 hasCode: true)**。
@@ -140,7 +147,9 @@ export async function POST(req: Request) {
   }
 ]
 
-共生成 5 道题。仅输出 JSON 数组，必须能通过 JSON.parse() 解析。`;
+一定要确保正确选项是随机的，不能固定为 A、B、C、D 中的一个，并且要保证正确选项的分布尽可能平均。
+共生成 5 道题。仅输出 JSON 数组，必须能通过 JSON.parse() 解析。
+绝对禁止输出任何 markdown 标记、解释文字、注释或 emoji 表情。`;
 
     let content = await callAI({
       messages: [
@@ -152,6 +161,7 @@ export async function POST(req: Request) {
       jsonMode: true,
       label: "PostCourseAssessment",
     });
+    console.log(systemPrompt);
 
     content = content
       .replace(/```json/g, "")

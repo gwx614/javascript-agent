@@ -15,7 +15,7 @@ import { PostCourseAssessmentForm } from "@/components/learning/PostCourseAssess
 import { useUIStore } from "@/store/useUIStore";
 import { useUserStore } from "@/store/useUserStore";
 import { useLearningStore } from "@/store/useLearningStore";
-import { STAGES } from "@/lib/courseConfig";
+import { STAGES } from "@/lib/config";
 
 export default function ChatPage() {
   const user = useUserStore((state) => state.user);
@@ -25,8 +25,6 @@ export default function ChatPage() {
   const hasHydrated = useUserStore((state) => state._hasHydrated);
   const hasCompletedCourse = useUserStore((state) => state.hasCompletedCourse);
   const finalReport = useUserStore((state) => state.finalReport);
-  const isStageAssessed = useUserStore((state) => state.isStageAssessed);
-
   const isSidebarOpen = useUIStore((state) => state.isSidebarOpen);
 
   const selectedCourseId = useUserStore((state) => state.selectedCourseId);
@@ -87,7 +85,9 @@ export default function ChatPage() {
       )}
 
       {/* ========== 左中：根据状态切换 ========== */}
-      {hasCompletedCourse ? (
+      {finalReport ? (
+        <PostCourseAssessmentForm onSelectNextCourse={() => setShowCourseSelectionModal(true)} />
+      ) : hasCompletedCourse ? (
         <PostCourseAssessmentForm onSelectNextCourse={() => setShowCourseSelectionModal(true)} />
       ) : hasOnboarded && !stageAssessed ? (
         <AssessmentForm />

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getPrisma } from "@/lib/prisma";
 import { callAI } from "@/lib/ai";
-import { STAGES } from "@/lib/courseConfig";
+import { STAGES } from "@/lib/config";
 import type { AssessmentQuestion } from "@/types";
 
 const prisma = getPrisma();
@@ -79,6 +79,13 @@ export async function POST(req: Request) {
 - 本阶段核心知识点全集：${coreKnowledge.join("、")}
 - 用户角色：${user.rolePosition || "未知"}
 - 技术水平：${user.skillLevel || "beginner"}
+- 职业身份：${user.careerIdentity || "未知"}
+- 编程经验：${user.experienceLevel || "未知"}
+- 学习目标：${user.learningGoal || "未知"}
+- 兴趣领域：${Array.isArray(user.interestAreas) ? user.interestAreas.join("、") : typeof user.interestAreas === "string" ? user.interestAreas : "未知"}
+- 偏好场景：${Array.isArray(user.preferredScenarios) ? user.preferredScenarios.join("、") : typeof user.preferredScenarios === "string" ? user.preferredScenarios : "未知"}
+- 目标水平：${user.targetLevel || "未知"}
+- 每周学习时间：${user.weeklyStudyTime || "未知"}
 # 摸底作答记录 (包含阅卷依据)
 ${qaText}
 =========================================
@@ -132,6 +139,9 @@ ${qaText}
 1. 不允许输出任何 markdown 标记（如 \`\`\`json ）。
 2. knowledgePoints 的数量必须与【本阶段核心知识点全集】的数量完全一致。
 3. questionAnalysis 数组的长度必须与【题目数量】一致。
+4. 绝对禁止输出任何解释文字或注释。
+5. 绝对禁止输出任何 emoji 表情。
+6. 只输出纯 JSON 字符串，能被 JSON.parse() 直接解析。
 直接输出纯 JSON 字符串。`;
 
     let content = await callAI({
@@ -145,6 +155,7 @@ ${qaText}
       label: "Diagnose",
     });
     console.log(systemPrompt);
+    console.log("AI Response:", content);
 
     content = content
       .replace(/```json/g, "")

@@ -49,6 +49,13 @@ export function AssessmentForm() {
     async function loadQuestions() {
       // 如果已经有缓存的报告了，说明已经测完了，不需要再去拉题目
       if (!user?.username || report) return;
+
+      console.log(`[AssessmentForm] 开始加载题目`, {
+        username: user.username,
+        selectedCourseId,
+        hasReport: !!report,
+      });
+
       try {
         setLoading(true);
         const res = await fetch("/api/assessment", {
@@ -57,6 +64,8 @@ export function AssessmentForm() {
           body: JSON.stringify({ username: user.username, selectedCourseId }),
         });
         const data = await res.json();
+        console.log(`[AssessmentForm] API 返回结果:`, data);
+
         if (!ignore) {
           if (data.error) {
             setError(data.error);
@@ -65,6 +74,7 @@ export function AssessmentForm() {
           }
         }
       } catch (err) {
+        console.error(`[AssessmentForm] 加载题目失败:`, err);
         if (!ignore) {
           setError("获取摸底题目失败，请刷新重试。");
         }

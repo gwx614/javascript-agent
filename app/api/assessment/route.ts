@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getPrisma } from "@/lib/prisma";
 import { callAI } from "@/lib/ai";
-import { STAGES } from "@/lib/courseConfig";
+import { STAGES } from "@/lib/config";
 import type { AssessmentQuestion } from "@/types";
 
 const prisma = getPrisma();
@@ -12,15 +12,31 @@ export async function POST(req: Request) {
     const username = data.username;
     const selectedCourseId = data.selectedCourseId;
 
+    console.log(`[Assessment] 接收到的请求参数:`, { username, selectedCourseId });
+
     if (!username) {
       return NextResponse.json({ error: "Missing username" }, { status: 400 });
+    }
+
+    if (!selectedCourseId) {
+      console.error(`[Assessment] 缺少 selectedCourseId 参数`);
+      return NextResponse.json({ error: "Missing selectedCourseId" }, { status: 400 });
     }
 
     const user = await prisma.user.findUnique({
       where: { username },
     });
 
+    console.log(`[Assessment] 查询用户 ${username}:`, {
+      userFound: !!user,
+      hasRoleReport: !!user?.roleReport,
+      roleReport: user?.roleReport?.substring(0, 50) + "...",
+      rolePosition: user?.rolePosition,
+      skillLevel: user?.skillLevel,
+    });
+
     if (!user || !user.roleReport) {
+      console.error(`[Assessment] 用户 ${username} 未完成入学引导或roleReport为空`);
       return NextResponse.json(
         { error: "User role position not found. Please complete orientation first." },
         { status: 400 }
@@ -104,6 +120,11 @@ export async function POST(req: Request) {
     const selectedStage = STAGES.find((s) => s.id === selectedCourseId);
     const coreKnowledgeStr = selectedStage?.coreKnowledge.join("、");
 
+    if (!selectedStage) {
+      console.error(`[Assessment] 无法找到课程阶段，selectedCourseId: ${selectedCourseId}`);
+      return NextResponse.json({ error: "Invalid selectedCourseId" }, { status: 400 });
+    }
+
     const systemPrompt = `
 你是一位资深的前端架构师和技术面试官，专门为 JavaScript 学习者设计【课前诊断测试】。
 你的目标是生成能够【真实检测用户理解深度】的题目，而不是考察死记硬背。
@@ -124,6 +145,20 @@ ${coreKnowledgeStr}
 ${user.roleReport}
 用户技术水平：
 ${user.skillLevel || "beginner"}
+职业身份：
+${user.careerIdentity || "未知"}
+编程经验：
+${user.experienceLevel || "未知"}
+学习目标：
+${user.learningGoal || "未知"}
+兴趣领域：
+${Array.isArray(user.interestAreas) ? user.interestAreas.join("、") : typeof user.interestAreas === "string" ? user.interestAreas : "未知"}
+偏好场景（设计需要场景的的题目时优先考虑）：
+${Array.isArray(user.preferredScenarios) ? user.preferredScenarios.join("、") : typeof user.preferredScenarios === "string" ? user.preferredScenarios : "未知"}
+目标水平：
+${user.targetLevel || "未知"}
+每周学习时间：
+${user.weeklyStudyTime || "未知"}
 水平说明：
 - beginner: 初学者，代码不超过 6 行，单一知识点
 - intermediate: 有一定经验，代码不超过 10 行，可以包含概念组合
@@ -171,8 +206,10 @@ Promise
 - 代码阅读（code_reading）
 --------------------------------------------------
 # 题目质量要求
+要根据用户的水平调整题目难度，beginner 题目难度低，intermediate 题目难度中等，advanced 题目难度高。
 错误选项必须代表真实的常见误区。
 不要出现明显错误或无意义选项。
+保证正确选项的位置一定要随机（不能所有题目的正确答案都是A选项之类）
 --------------------------------------------------
 # 输出格式（严格 JSON）
 你必须 **只输出一个合法 JSON 数组**。
@@ -203,14 +240,17 @@ JSON.parse()
 --------------------------------------------------
 # 最终检查规则（生成前请自检）
 在输出之前，请确保：
-1. 题目数量必须 = 3  
-2. 每题 targetKnowledge 必须来自给定列表  
-3. 至少包含 2 种不同 conceptType  
-4. JSON 格式完全合法  
-5. correctAnswers 必须和 options 中的字符串完全一致  
+1. 题目数量必须 = 3
+2. 每题 targetKnowledge 必须来自给定列表
+3. 至少包含 2 种不同 conceptType
+4. JSON 格式完全合法
+5. correctAnswers 必须和 options 中的字符串完全一致
+6. 绝对禁止输出任何 markdown 标记（如 \`\`\`json ）
+7. 绝对禁止输出任何解释文字或注释
+8. 绝对禁止输出任何 emoji 表情
+9. 只输出纯 JSON 数组，能被 JSON.parse() 直接解析
 --------------------------------------------------
-请直接输出 JSON 数组。
-`;
+请直接输出 JSON 数组。`;
 
     // (AI Calling logic)
     let content = await callAI({
