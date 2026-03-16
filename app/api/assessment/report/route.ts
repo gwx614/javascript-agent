@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { getPrisma } from "@/lib/core/db";
-import { callAI } from "@/lib/services/ai/chat.service";
 import { STAGES } from "@/lib/core/config";
 import type { AssessmentQuestion } from "@/types";
 
@@ -105,15 +104,14 @@ export async function POST(req: Request) {
 绝对禁止输出任何 markdown 标记、解释文字、注释或 emoji 表情。
 只输出纯 JSON 字符串，能被 JSON.parse() 直接解析。`;
 
-    let content = await callAI({
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: "请生成最终学习报告 JSON。" },
-      ],
+    const { invokeGeneralAgent } = await import("@/lib/services/ai/ai.service");
+
+    let content = await invokeGeneralAgent({
+      userIdentifier: user.id,
+      systemPrompt,
+      input: "请生成最终学习报告 JSON。",
       temperature: 0.5,
-      maxTokens: 2000,
-      jsonMode: true,
-      label: "FinalReport",
+      tools: [], // 明确禁用工具调用以减少 token 开销
     });
 
     content = content

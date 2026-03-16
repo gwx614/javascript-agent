@@ -2,13 +2,6 @@ import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 
 export function useAgentChat(user: Record<string, any> | null) {
-  console.log("[useAgentChat] 用户数据:", user);
-  console.log("[useAgentChat] 用户 ID:", user?.id);
-
-  if (!user) {
-    console.warn("[useAgentChat] 警告: 用户数据为 null,聊天功能可能无法正常查询用户数据");
-  }
-
   const { messages, sendMessage, status, stop } = useChat({
     transport: new DefaultChatTransport({
       api: "/api/chat",

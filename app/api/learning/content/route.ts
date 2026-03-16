@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
 import { getPrisma } from "@/lib/core/db";
-import { streamAI } from "@/lib/services/ai/chat.service";
-import { STAGES, type StageNode } from "@/lib/core/config";
-import { retrieveRelevantDocuments } from "@/lib/rag";
+import { STAGES, type StageNode, JS_LEARNING_SYSTEM_PROMPT } from "@/lib/core/config";
 import type { KnowledgePointStatus } from "@/types";
 
 const prisma = getPrisma();
@@ -125,49 +123,8 @@ export async function POST(req: Request) {
       }
     }
 
-    // 4. 使用RAG检索相关知识库内容
-    console.log(`\n🔍 为学习内容检索相关知识: "${sectionTitle}"`);
-
-    // 适配新的两级大纲结构：支持检索一级菜单或子章节
-    // 如果是子章节，sectionTitle 格式为 "一级菜单标题 > 子章节标题"
-    const isSubSection = sectionTitle.includes(" > ");
-    const searchQuery = isSubSection
-      ? sectionTitle.split(" > ")[1] // 提取子章节标题作为搜索查询
-      : sectionTitle;
-
-    const relevantDocs = await retrieveRelevantDocuments(searchQuery, {
-      topK: 3,
-      maxContextLength: 6000,
-    });
-
-    // 构建知识库上下文
-    let knowledgeContext = "";
-    if (relevantDocs.length > 0) {
-      const docsContent = relevantDocs
-        .map(
-          (doc: any, index: number) =>
-            `## 参考资料 ${index + 1}: ${doc.metadata?.title || "技术文档"}\n${doc.content}`
-        )
-        .join("\n\n");
-
-      knowledgeContext = `
-# 知识库参考 (权威技术文档)
-以下是从权威技术文档中检索到的相关内容，请结合这些内容生成教程：
-
-${docsContent}
-
-**重要提示**：在生成教程时，请优先参考以上权威技术文档的内容，确保技术准确性。可以结合文档中的示例和解释，但要转化为通俗易懂的教学语言。
-`;
-    }
-
-    // 5. 三次迭代：通俗易懂的学霸笔记版 Prompt
-    const systemPrompt = `你是一个讲课极其生动、图文并茂的技术大牛。你正在为用户编写【${courseTitle}】课程中【${sectionTitle}】的学习笔记。
-
-# 教学大纲预设要求 (核心指令)
-本小节务必围绕以下核心描述展开教学：
-> ${sectionDescription}
-
-# 用户上下文
+    // 4. 重构：使用 LangChain Agent 生成内容
+    const userContext = `
 - 职业定位: ${user.roleReport || "前端开发"}
 - 基础水平: ${skillLevel}
 - 学习策略: ${sectionStatus || "learn"}
@@ -177,89 +134,108 @@ ${docsContent}
 - 兴趣领域: ${Array.isArray(user.interestAreas) ? user.interestAreas.join("、") : typeof user.interestAreas === "string" ? user.interestAreas : "未知"}
 - 目标水平: ${user.targetLevel || "未知"}
 - 补充说明: ${user.additionalNotes || "无"}
+- 偏好场景: ${Array.isArray(user.preferredScenarios) ? user.preferredScenarios.join("、") : typeof user.preferredScenarios === "string" ? user.preferredScenarios : "未知"}
+    `.trim();
 
+    const systemPrompt = `
+你是一个讲课极其生动、图文并茂的技术大牛。你擅长将复杂的底层原理用白话讲透。
+
+${JS_LEARNING_SYSTEM_PROMPT}
+
+### 内容创作指南
+1. **降维打击**：用最通俗易懂的语言解释复杂概念，严禁堆砌术语。
+2. **场景化**：结合实际业务场景或生活类比来讲解。
+3. **学霸笔记**：输出结构清晰、带图解（ASCII/表格）的内容。
+`.trim();
+
+    const fullInput = `
+请为【${sectionTitle}】生成详细的 Markdown 学习教程。
+
+# 教学大纲要求
+> ${sectionDescription}
+
+# 用户上下文与硬约束
+${userContext}
+
+# 生成策略与侧重点
 ${depthInstruction}
+
 ${diagnosisContext}
-${knowledgeContext}
 
-# 生成规范 (最高优先级)
-1. 这是用户喜欢的导师风格: ${user.tutorStyle || "未知"}，请以该风格生成文章内容
-2. **“学霸笔记”风格体裁**：文章必须像一份精心整理的、图文并茂的复习笔记。语言要通俗接地气，千万不要像机器翻译的官方文档。采用清晰的层级。
-3. **生动开场与类比**：在解释任何抽象语法前，**必须先用一个极度生活化的通俗比喻**来铺垫。
-4. **图解辅助思维**：不要用干巴巴的文字！凡是涉及到“原理”、“对比”、“状态转移”、“内存流转”的东西，**必须优先输出 Markdown 表格或 ASCII 排版图解**。
-5. **【核心约束】克制的微代码**：
-   - 最长的演示代码块**绝对禁止超过 15 行**！
-   - 写代码只写“最硬核的增量逻辑”，去掉假数据和 \`console.log\` 刷屏。
-   - 所有变量名必须带着浓厚的【职业定位】风味。
-6. **画龙点睛的排版**：不允许使用任何Emoji（如 📌、💡、⚠️）。
-7. 一定要结合用户的职业定位和学习目标，生成符合对方需求的学习内容。
-8. 这是用户偏好的学习场景（设计需要场景的的内容时优先考虑）: ${Array.isArray(user.preferredScenarios) ? user.preferredScenarios.join("、") : typeof user.preferredScenarios === "string" ? user.preferredScenarios : "未知"}
-9. 可以在笔记末尾为用户推荐相关的学习资源（如：书籍、视频、在线课程等），但不能超过 3 个，同时尽可能是中文或者官方社区的内容。
+# 风格与规范
+1. 导师风格: ${user.tutorStyle || "专业、严谨且富有耐心"}
+2. **“学霸笔记”风格**：像一份精心整理的复习笔记，语言通俗接地气。
+3. **生动开场**：必须先用一个生活化的通俗比喻开场。
+4. **图解辅助**：涉及到原理或状态流转，必须输出 Markdown 表格或 ASCII 图解。
+5. **克制的微代码**：单个代码块禁止超过 15 行，仅展示核心逻辑。
+6. **严禁 Emoji**：不允许使用任何 Emoji。
 
-一句话核心诉求：用最说人话的类比、最一目了然的内容框架，以及贴合对方技术水平、职业方向的微代码，生成一篇阅读体验极佳、内容丰富完善的“高维降维学习笔记”。请直接输出纯 Markdown。`;
+请开始你的创作，直接输出纯 Markdown。
+`;
 
-    const stream = await streamAI({
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: `请为【${sectionTitle}】生成详细的 Markdown 学习教程。` },
-      ],
-      temperature: 0.5,
-      maxTokens: 3000,
-      label: "Content Stream",
+    const { streamAgentInvocation } = await import("@/lib/services/ai/ai.service");
+
+    const logStream = await streamAgentInvocation({
+      userIdentifier: user.id || user.username || "anonymous",
+      systemPrompt,
+      input: fullInput,
+      temperature: 0.7,
     });
-    console.log(systemPrompt);
 
-    // 3. 为了持久化，我们需要拦截并保存流内容
-    // 这里使用一个简单的 TransformStream 来捕获累积的内容
+    const encoder = new TextEncoder();
     let fullContent = "";
-    const transformStream = new TransformStream({
-      transform(chunk, controller) {
-        const text = new TextDecoder().decode(chunk);
-        // 解析 SSE 格式数据，提取真正的文本内容进行持久化
-        const lines = text.split("\n");
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (trimmed.startsWith("data: ")) {
-            const dataStr = trimmed.slice(6);
-            try {
-              const data = JSON.parse(dataStr);
-              if (data.type === "text-delta" && data.delta) {
-                fullContent += data.delta;
-              }
-            } catch (e) {
-              // 处理非 JSON 的情况，防止保存失败
-              if (dataStr !== "[DONE]") {
-                fullContent += dataStr;
+
+    const stream = new ReadableStream({
+      async start(controller) {
+        try {
+          // logStream 现在是 LangGraph 的消息流
+          for await (const chunk of logStream) {
+            // 解析 LangGraph 的 messages 流
+            // chunk 通常是 [AIMessageChunk, metadata] 或直接是消息对象
+            const message = Array.isArray(chunk) ? chunk[0] : chunk;
+            if (message && message.content) {
+              const text =
+                typeof message.content === "string"
+                  ? message.content
+                  : JSON.stringify(message.content);
+
+              if (text) {
+                fullContent += text;
+                const sseData = `data: ${JSON.stringify({ type: "text-delta", delta: text })}\n\n`;
+                controller.enqueue(encoder.encode(sseData));
               }
             }
           }
-        }
-        controller.enqueue(chunk);
-      },
-      async flush() {
-        // 流结束后保存到数据库
-        try {
-          await prisma.sectionContent.upsert({
-            where: {
-              stageId_sectionId: {
-                stageId: stage!.id,
-                sectionId: sectionId,
+
+          controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+          controller.close();
+
+          // 保存结果到数据库
+          if (fullContent) {
+            await prisma.sectionContent.upsert({
+              where: {
+                stageId_sectionId: {
+                  stageId: stage.id,
+                  sectionId: sectionId,
+                },
               },
-            },
-            update: { content: fullContent },
-            create: {
-              stageId: stage!.id,
-              sectionId: sectionId,
-              content: fullContent,
-            },
-          });
+              update: { content: fullContent },
+              create: {
+                stageId: stage.id,
+                sectionId: sectionId,
+                content: fullContent,
+              },
+            });
+            console.log(`✅ 已保存生成的学习内容 (长度: ${fullContent.length})`);
+          }
         } catch (e) {
-          console.error("Failed to save stream content to DB", e);
+          console.error("Stream generation error:", e);
+          controller.error(e);
         }
       },
     });
 
-    return new Response(stream.pipeThrough(transformStream), {
+    return new Response(stream, {
       headers: {
         "Content-Type": "text/event-stream",
         "Cache-Control": "no-cache",

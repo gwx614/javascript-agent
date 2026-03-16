@@ -136,16 +136,11 @@ export async function retrieveRelevantDocuments(
 
     // 扩展查询以提高检索准确性
     const expandedQuery = expandQuery(query);
-    console.log(`\n🔍 RAG 检索: "${expandedQuery}"`);
-
     const queryEmbedding = await generateEmbedding(expandedQuery);
     const collection = await getOrCreateCollection();
     const docCount = await collection.count();
 
-    console.log(`📊 数据库中有 ${docCount} 条记录`);
-
     if (docCount === 0) {
-      console.log("⚠️  数据库为空，无法检索");
       return [];
     }
 
@@ -207,14 +202,6 @@ export async function retrieveRelevantDocuments(
 
     const finalResults = uniqueResults.slice(0, adjustedTopK);
 
-    // 打印检索结果
-    console.log(`✅ 找到 ${finalResults.length} 个相关文档:`);
-    finalResults.forEach((doc, index) => {
-      const similarity = (1 - doc.distance).toFixed(2);
-      const title = doc.metadata?.title || "未知文档";
-      console.log(`  ${index + 1}. [${similarity}] ${title}`);
-    });
-
     return finalResults;
   } catch (error) {
     console.error("检索文档失败:", error);
@@ -233,18 +220,11 @@ export async function ragGenerate(
   try {
     const startTime = Date.now();
     const config = { ...DEFAULT_RAG_OPTIONS, ...options };
-    console.log(`\n🚀 开始 RAG 增强生成`);
-    console.log(`📋 查询信息: 长度 ${query.length} 字符`);
 
     // 检索相关文档
-    const retrieveStartTime = Date.now();
     const relevantDocs = await retrieveRelevantDocuments(query, config);
-    const retrieveEndTime = Date.now();
-
-    console.log(`⏱️  检索耗时: ${(retrieveEndTime - retrieveStartTime).toFixed(1)}ms`);
 
     if (relevantDocs.length === 0) {
-      console.log("⚠️  未找到相关文档，使用原始查询");
       return query;
     }
 
@@ -258,10 +238,6 @@ export async function ragGenerate(
 
 请根据文档内容提供专业、准确的回答。`.length;
     const availableContextLength = maxContextLength - basePromptLength;
-
-    console.log(
-      `📊 上下文配置: 最大长度 ${maxContextLength} 字符, 可用长度 ${availableContextLength} 字符`
-    );
 
     // 按相关性排序文档
     const sortedDocs = [...relevantDocs].sort((a, b) => 1 - a.distance - (1 - b.distance));
@@ -293,10 +269,6 @@ export async function ragGenerate(
       }
     }
 
-    // 打印上下文预览
-    console.log(`📄 上下文预览 (前 500 字符):`);
-    console.log(context.substring(0, 500) + (context.length > 500 ? "..." : ""));
-
     // 构建增强的提示词
     const enhancedPrompt = `基于以下相关文档内容回答问题：
 
@@ -309,13 +281,6 @@ ${context}
     const endTime = Date.now();
     const totalTime = endTime - startTime;
     const contextUsage = Math.round((totalLength / availableContextLength) * 100);
-
-    console.log(`✅ RAG 增强完成`);
-    console.log(
-      `📊 上下文统计: 长度 ${context.length} 字符 (限制: ${maxContextLength} 字符, 使用率: ${contextUsage}%)`
-    );
-    console.log(`📋 文档统计: 包含 ${includedDocs} 个文档, 截断 ${truncatedDocs} 个文档`);
-    console.log(`⏱️  总耗时: ${totalTime.toFixed(1)}ms`);
 
     // 返回增强的提示词，供后续 AI 调用使用
     return enhancedPrompt;
@@ -331,10 +296,8 @@ ${context}
  */
 export async function checkVectorDBStatus(): Promise<{ status: string; stats: any }> {
   try {
-    console.log("\n📋 检查向量数据库状态");
     const collection = await getOrCreateCollection();
     const stats = await collection.count();
-    console.log(`✅ 数据库状态: 正常，记录数: ${stats}`);
 
     return {
       status: "ok",

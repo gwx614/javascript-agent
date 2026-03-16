@@ -29,21 +29,6 @@ export async function POST(req: Request) {
 
     const prisma = getPrisma();
 
-    console.log(`[Profile] 保存用户 ${username} 的画像数据:`, {
-      rolePosition,
-      roleReport: roleReport?.substring(0, 50) + "...",
-      skillLevel,
-      careerIdentity,
-      experienceLevel,
-      learningGoal,
-      interestAreas,
-      preferredScenarios,
-      targetLevel,
-      tutorStyle,
-      weeklyStudyTime,
-      additionalNotes,
-    });
-
     // 构建 Prisma 更新数据对象（所有字段都是字符串类型）
     const updateData: Prisma.UserUpdateInput = {};
 
@@ -83,6 +68,7 @@ export async function POST(req: Request) {
     return NextResponse.json({
       success: true,
       user: {
+        id: user.id,
         username: user.username,
         rolePosition: user.rolePosition,
         roleReport: user.roleReport,
@@ -141,6 +127,7 @@ export async function GET(req: Request) {
     return NextResponse.json({
       success: true,
       user: {
+        id: user.id,
         username: user.username,
         name: user.name,
         email: user.email,

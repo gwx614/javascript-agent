@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { getPrisma } from "@/lib/core/db";
-import { callAI } from "@/lib/services/ai/chat.service";
 import { STAGES } from "@/lib/core/config";
 
 const prisma = getPrisma();
@@ -40,9 +39,6 @@ export async function POST(req: Request) {
         // --- 核心优化：Token 节流与阻塞等待逻辑 ---
         // 如果题目是空数组，说明另一个进程正在生成中
         if (Array.isArray(questions) && questions.length === 0) {
-          console.log(
-            `[Post-Assessment] Race condition detected for ${username}. Waiting for generation...`
-          );
           let attempts = 0;
           const maxAttempts = 20; // 最多等待 20 秒
 
@@ -56,15 +52,9 @@ export async function POST(req: Request) {
             });
 
             if (updatedStage?.postQuestions && updatedStage.postQuestions !== "[]") {
-              console.log(
-                `[Post-Assessment] Generation finished for ${username} after ${attempts}s.`
-              );
               return NextResponse.json({ questions: JSON.parse(updatedStage.postQuestions) });
             }
           }
-          console.log(
-            `[Post-Assessment] Wait timed out for ${username}. Proceeding to re-generate.`
-          );
           // 超时放行重试
         } else if (Array.isArray(questions) && questions.length > 0) {
           return NextResponse.json({ questions });
@@ -151,17 +141,15 @@ export async function POST(req: Request) {
 共生成 5 道题。仅输出 JSON 数组，必须能通过 JSON.parse() 解析。
 绝对禁止输出任何 markdown 标记、解释文字、注释或 emoji 表情。`;
 
-    let content = await callAI({
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: "请为该结课阶段生成测验题目。" },
-      ],
+    const { invokeGeneralAgent } = await import("@/lib/services/ai/ai.service");
+
+    let content = await invokeGeneralAgent({
+      userIdentifier: user.id || "anonymous",
+      systemPrompt,
+      input: "请为该结课阶段生成测验题目。",
       temperature: 0.7,
-      maxTokens: 2000,
-      jsonMode: true,
-      label: "PostCourseAssessment",
+      tools: [], // 明确禁用工具调用以减少 token 开销
     });
-    console.log(systemPrompt);
 
     content = content
       .replace(/```json/g, "")

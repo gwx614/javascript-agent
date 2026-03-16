@@ -1,4 +1,5 @@
 import { DynamicTool } from "@langchain/core/tools";
+import { unwrapToolInput } from "@/lib/core/utils";
 
 /**
  * 创建联网搜索工具
@@ -12,32 +13,8 @@ export async function createWebSearchTool() {
       "当用户询问你不知道的内容、或是关于2024年及以后的最新技术动态、实时信息、技术文档或网络具体内容时，调用此工具。它会从互联网搜索相关信息。输入应该是清晰的搜索查询，例如 '最新 JavaScript 规范' 或 'React 19 新特性'。",
     func: async (input: string | Record<string, any>) => {
       try {
-        // 兼容不同格式的输入
-        let query = typeof input === "string" ? input : JSON.stringify(input);
-
-        // 循环解包 JSON
-        let depth = 0;
-        while (
-          depth < 3 &&
-          (query.includes('"query":') ||
-            query.includes('"input":') ||
-            (query.startsWith("{") && query.endsWith("}")))
-        ) {
-          try {
-            const parsed = JSON.parse(query);
-            query =
-              parsed.query ||
-              parsed.input ||
-              parsed.search ||
-              (typeof parsed === "string" ? parsed : null);
-            if (!query || query === query) break;
-            depth++;
-          } catch (e) {
-            break;
-          }
-        }
-
-        console.log(`[WebSearch] 搜索查询: ${query}`);
+        // 智能解包输入，支持多层 JSON 嵌套
+        const query = unwrapToolInput(input);
 
         // 调用 Tavily Search API
         const results = await tavilySearch(query);
@@ -52,7 +29,6 @@ export async function createWebSearchTool() {
           })
           .join("\n\n");
 
-        console.log(`[WebSearch] 返回 ${output.length} 字符的内容`);
         return output;
       } catch (error) {
         console.error("[WebSearch] 搜索出错:", error);

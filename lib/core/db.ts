@@ -8,7 +8,6 @@ import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
 
 const prismaClientSingleton = () => {
   const dbUrl = process.env.DATABASE_URL;
-  console.log("[Prisma] DATABASE_URL:", dbUrl);
 
   if (!dbUrl) {
     throw new Error("DATABASE_URL 环境变量未设置！请检查 .env 文件");

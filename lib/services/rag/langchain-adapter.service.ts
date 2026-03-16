@@ -49,12 +49,10 @@ export class SQLiteLangChainVectorStore extends VectorStore {
     k: number,
     _filter?: this["FilterType"]
   ): Promise<[Document, number][]> {
-    console.log(`[Adapter] Querying SQLite with vector (length: ${query.length}), k: ${k}`);
     const results = await this.sqliteDB.query({
       queryEmbedding: query,
       nResults: k,
     });
-    console.log(`[Adapter] Found ${results.length} raw results from SQLite`);
 
     return results.map((res) => [
       new Document({

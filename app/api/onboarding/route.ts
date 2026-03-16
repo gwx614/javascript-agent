@@ -1,4 +1,3 @@
-import { callAI } from "@/lib/services/ai/chat.service";
 import { OnboardingSurveyItem } from "@/types";
 
 interface SurveyData {
@@ -116,15 +115,15 @@ export async function POST(req: Request) {
     
     [正文：用一段100~200字左右的连贯文字，简单准确地结合问卷介绍他为什么属于这个定位（注意使用"你"来称呼用户）]`;
 
+    const { invokeGeneralAgent } = await import("@/lib/services/ai/ai.service");
+
     const reportText =
-      (await callAI({
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: `这是用户的真实学习画像：\n${JSON.stringify(data, null, 2)}` },
-        ],
+      (await invokeGeneralAgent({
+        userIdentifier: "new-user-onboarding",
+        systemPrompt,
+        input: `这是用户的真实学习画像：\n${JSON.stringify(data, null, 2)}`,
         temperature: 0.8,
-        maxTokens: 800,
-        label: "Onboarding",
+        tools: [], // 禁用工具调用以减少 token 开销
       })) || "无法生成报告，可能未获取到有效内容。";
 
     // 返回角色报告 + 结构化用户画像数据

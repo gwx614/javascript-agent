@@ -1,5 +1,6 @@
 import { DynamicTool } from "@langchain/core/tools";
 import { getPrisma } from "@/lib/core/db";
+import { unwrapToolInput } from "@/lib/core/utils";
 
 /**
  * 创建数据库查询工具
@@ -15,19 +16,8 @@ export async function createDatabaseQueryTool(userIdentifier: string) {
       "工具内置了对当前用户的数据隔离保护。",
     func: async (input: string | Record<string, any>) => {
       try {
-        let queryDescription = typeof input === "string" ? input : JSON.stringify(input);
-
-        // 智能提取查询核心描述
-        if (queryDescription.startsWith("{")) {
-          try {
-            const parsed = JSON.parse(queryDescription);
-            queryDescription = parsed.query || parsed.input || parsed.search || queryDescription;
-          } catch (e) {
-            // Keep original if parse fails
-          }
-        }
-
-        console.log(`[DatabaseQuery] 任务: ${queryDescription} (用户: ${userIdentifier})`);
+        // 智能解包输入，拿到核心描述
+        const queryDescription = unwrapToolInput(input);
 
         // 1. 生成 SQL (注入专家级 Schema 知识)
         const sqlQuery = await generateAgenticSqlQuery(queryDescription, userIdentifier);
@@ -127,7 +117,6 @@ async function executeSecureSqlQuery(sql: string, userIdentifier: string): Promi
     throw new Error("Security Alert: Dangerous keywords detected.");
   }
 
-  console.log(`[ExecuteSQL] Running: ${sql}`);
   return await prisma.$queryRawUnsafe<any[]>(sql);
 }
 

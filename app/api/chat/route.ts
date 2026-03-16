@@ -1,12 +1,8 @@
-import { JS_LEARNING_SYSTEM_PROMPT, DEFAULT_MODEL, getAIApiKey } from "@/lib/core/config";
-import { createJavascriptSearchTool } from "@/lib/tools/javascript-search.tool";
-import { createWebSearchTool } from "@/lib/tools/web-search.tool";
-import { createDatabaseQueryTool } from "@/lib/tools/db-query.tool";
-import { ChatOpenAI } from "@langchain/openai";
-import { StateGraph, START, MessagesAnnotation } from "@langchain/langgraph";
-import { ToolNode, toolsCondition } from "@langchain/langgraph/prebuilt";
-import { SystemMessage, HumanMessage, AIMessage } from "@langchain/core/messages";
+import { JS_LEARNING_SYSTEM_PROMPT } from "@/lib/core/config";
+import { HumanMessage, AIMessage } from "@langchain/core/messages";
+import { getPrisma } from "@/lib/core/db";
 import type { ChatMessagePayload } from "@/types";
+import { unwrapToolInput } from "@/lib/core/utils";
 
 /**
  * 流式对话 API 路由
@@ -29,17 +25,9 @@ export async function POST(req: Request) {
         const headerUser = JSON.parse(decodeURIComponent(userHeader));
         // body 优先，但 header 作为备份或补充
         user = user || headerUser;
-        if (user) {
-          console.log(`[ChatRoute] 解析用户数据 (${payload.user ? "body" : "header"}):`, user);
-          console.log(`[ChatRoute] 用户 ID:`, user?.id);
-        }
       } catch (e) {
         console.error("Failed to parse user header", e);
       }
-    } else if (user) {
-      console.log(`[ChatRoute] 从 body 中获取到用户数据:`, user);
-    } else {
-      console.log("[ChatRoute] 未在 header 或 body 中找到用户信息");
     }
 
     // 转换消息格式为 LangChain 格式
@@ -68,105 +56,64 @@ export async function POST(req: Request) {
     }
 
     // 构建系统提示词
-    const toolInstructions = `
-# 搜索工具使用指南
+    // 1. 定义聊天场景专属人设 (Persona)
+    const chatPersona = `你是一位专业的 JavaScript 金牌导师。
+针对不同的学习者，你擅长：
+- **由浅入深**：将复杂的概念拆解为易读的小块知识。
+- **循循善诱**：多提问引导用户思考，而非直接给出所有答案。
+- **情感支持**：在用户遇到挫折时给予鼓励，庆祝他们的每一个小进步。
 
-## 工具列表
-1. **search_javascript_knowledge** (优先使用)
-   - 用途: 搜索 JavaScript 相关的技术问题、语法、底层原理、API 用法
-   - 优势: 快速、免费、针对 JavaScript 优化
-   - 使用场景: 问 JavaScript 语法、原理、API、最佳实践等
+你的语气应该是：${user?.tutorStyle || "专业、耐心、富有亲和力"}。`;
 
-2. **web_search** (必要时使用)
-   - 用途: 从互联网搜索最新新闻、实时信息、最新文档
-   - 使用场景: 问最新事件、新闻、最新技术动态、网络上的具体内容
+    // 2. 引入通用的工具指南 (从 config.ts 获取)
+    let baseSystemPrompt = `${chatPersona}\n\n${JS_LEARNING_SYSTEM_PROMPT}`;
 
-3. **query_database** (查询数据库)
-   - 用途: 查询 SQLite 数据库中的用户数据
-   - 可查询内容:
-     * 用户信息 (姓名、邮箱、技能等级等)
-     * 学习进度 (课程阶段状态、完成情况)
-     * 课程内容 (各章节的教程内容)
-     * 对话记录 (历史聊天记录)
-   - 特点: 自动识别当前用户,只查询该用户的数据
-   - 使用场景: 问"我的学习进度"、"我最近的对话"、"我的学习报告"等
+    // 3. 注入用户专属的角色定位
+    if (user?.rolePosition) {
+      baseSystemPrompt += `\n\n## 当前教学策略调整
+你当前的教学对象是一位：【${user.rolePosition}】。请严格根据此定位调整你的口吻、辅导方式和交流深度。`;
+    }
 
-## 工具选择策略
-- 如果问题是关于 JavaScript 的,优先使用 **search_javascript_knowledge**
-- 如果问题需要最新信息 (如"最新"、"现在"、"最近"等关键词),使用 **web_search**
-- 如果问题涉及查询用户自己的数据 (如"我的"、"我最近"、"我的学习"等),使用 **query_database**
-- 如果本地知识库没有相关内容,使用 **web_search** 补充
-
-## 回答要求
-- 获取工具返回的参考资料后,结合这些资料提供专业、严谨且易懂的总结性回答
-- **【强制限制】严禁在最终回答中透出任何 SQL 语句、数据库内部 ID、工具函数名或底层执行日志 (除非用户明确要求查看 SQL)**
-- 即使工具返回了包含 SQL 的调试信息，你也必须在呈现给用户前将其彻底剥离或转化为自然语言描述
-- 绝不要直接返回工具的原始输出,始终以导师的身份进行讲解
-- 保持回答的简洁和人性化,直接展示用户关心的业务信息(如进度、状态、具体内容)
-- 如果所有工具都没有相关内容,告知用户并基于自身知识给出最佳建议`;
-
-    let baseSystemPrompt = user?.rolePosition
-      ? `${JS_LEARNING_SYSTEM_PROMPT}\n\n当前用户的专属角色定位是：【${user.rolePosition}】。请你在接下来的所有回复中，严格保持这个角色定位对应的口吻、辅导方式和交流深度。`
-      : JS_LEARNING_SYSTEM_PROMPT;
-    baseSystemPrompt += toolInstructions;
-
+    // 2. 注入用户画像详细信息 (如果存在)
     if (user) {
-      baseSystemPrompt += `\n\n# 用户画像信息
+      baseSystemPrompt += `\n\n## 用户画像信息
 - 职业身份: ${user.careerIdentity || "未知"}
 - 编程经验: ${user.experienceLevel || "未知"}
 - 学习目标: ${user.learningGoal || "未知"}
 - 兴趣领域: ${Array.isArray(user.interestAreas) ? user.interestAreas.join("、") : typeof user.interestAreas === "string" ? user.interestAreas : "未知"}
 - 偏好场景: ${Array.isArray(user.preferredScenarios) ? user.preferredScenarios.join("、") : typeof user.preferredScenarios === "string" ? user.preferredScenarios : "未知"}
 - 目标水平: ${user.targetLevel || "未知"}
-- 导师风格: ${user.tutorStyle || "未知"}
 - 每周学习时间: ${user.weeklyStudyTime || "未知"}
 - 补充说明: ${user.additionalNotes || "无"}`;
     }
 
-    // 初始化模型 (连接 DashScope)
-    const model = new ChatOpenAI({
-      modelName: DEFAULT_MODEL,
-      apiKey: getAIApiKey(),
-      configuration: {
-        baseURL: "https://dashscope.aliyuncs.com/compatible-mode/v1/",
-      },
-      temperature: 0.3, // 降低随机性，使 Agent 更倾向于使用搜索结果
-      streaming: true,
-    });
-
-    // 创建工具
-    const searchTool = await createJavascriptSearchTool();
-    const webSearchTool = await createWebSearchTool();
-    // 使用 id 或 username 作为用户标识
-    const userIdentifier = user?.id || user?.username || "anonymous";
-    console.log(`[ChatRoute] 使用用户标识: ${userIdentifier}`);
+    // 开发环境下尝试获取一个真实用户作为 fallback，避免 anonymous 导致的工具查询为空
+    let userIdentifier = user?.id || user?.username;
+    if (!userIdentifier) {
+      const fallbackUser = await getPrisma().user.findFirst({
+        orderBy: { updatedAt: "desc" },
+      });
+      if (fallbackUser) {
+        userIdentifier = fallbackUser.id;
+      } else {
+        userIdentifier = "anonymous";
+      }
+    }
 
     // 如果没有有效用户标识,警告但继续
     if (userIdentifier === "anonymous") {
       console.warn("[ChatRoute] 警告: 未找到有效用户标识,将使用 anonymous 进行查询");
     }
 
-    const dbQueryTool = await createDatabaseQueryTool(userIdentifier);
-    const tools = [searchTool, webSearchTool, dbQueryTool];
-    const toolNode = new ToolNode(tools);
+    // 初始化通用 Agent
+    const { getGeneralAgent } = await import("@/lib/services/ai/ai.service");
 
-    // 定义 Agent 状态图
-    const chatModelWithTools = model.bindTools(tools);
-
-    async function callModel(state: typeof MessagesAnnotation.State) {
-      // 在消息开头插入系统提示词
-      const messagesWithSystem = [new SystemMessage(baseSystemPrompt), ...state.messages];
-      return { messages: await chatModelWithTools.invoke(messagesWithSystem) };
-    }
-
-    const workflow = new StateGraph(MessagesAnnotation)
-      .addNode("agent", callModel)
-      .addNode("tools", toolNode)
-      .addEdge(START, "agent")
-      .addConditionalEdges("agent", toolsCondition)
-      .addEdge("tools", "agent");
-
-    const app = workflow.compile();
+    const app = await getGeneralAgent({
+      userIdentifier,
+      systemPrompt: baseSystemPrompt,
+      temperature: 0.3, // 降低随机性，使 Agent 更倾向于使用搜索结果
+      streaming: true,
+    });
 
     // 准备流式响应
     const encoder = new TextEncoder();
@@ -189,7 +136,7 @@ export async function POST(req: Request) {
           for await (const event of eventStream) {
             const eventType = event.event;
 
-            // 处理模型生成的文字增量
+            // 处理模型生成的文字增量 (LangGraph event)
             if (eventType === "on_chat_model_stream") {
               const content = event.data.chunk.content;
               if (content) {
@@ -203,20 +150,21 @@ export async function POST(req: Request) {
                   )
                 );
               }
-            }
-            // 处理工具调用开始
-            else if (eventType === "on_tool_start") {
+            } else if (eventType === "on_tool_start") {
+              const input = event.data.input;
+              const name = event.name;
+              const unwrapInput = unwrapToolInput(input);
+              console.log(`\x1b[36m[Agent Tool Call]\x1b[0m 正在调用: ${name}`);
               console.log(
-                `[Agent] Calling tool: ${event.name} with input: ${JSON.stringify(event.data.input)}`
+                `\x1b[90m[Input]\x1b[0m ${
+                  typeof unwrapInput === "string" ? unwrapInput : JSON.stringify(unwrapInput)
+                }`
               );
-            }
-            // 处理工具调用结束
-            else if (eventType === "on_tool_end") {
+            } else if (eventType === "on_tool_end") {
               const output = event.data.output;
-              // 兼容 ToolMessage 对象或原始字符串
               const content = typeof output === "string" ? output : output?.content || "";
               console.log(
-                `[Agent] Tool ${event.name} finished. Found ${content.length} chars of content.`
+                `\x1b[32m[Tool Result]\x1b[0m ${event.name} 执行完毕，获取到约 ${content.length} 字符数据。`
               );
             }
           }

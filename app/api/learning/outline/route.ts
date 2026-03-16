@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { getPrisma } from "@/lib/core/db";
-import { callAI } from "@/lib/services/ai/chat.service";
 import { STAGES, type StageNode } from "@/lib/core/config";
 import type { KnowledgePointStatus } from "@/types";
 
@@ -245,15 +244,14 @@ JSON结构必须完全符合：
 11. 只输出纯 JSON 数组，能被 JSON.parse() 直接解析
 只输出 JSON。`;
 
-    let content = await callAI({
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: "请生成 JSON 学习大纲。" },
-      ],
+    const { invokeGeneralAgent } = await import("@/lib/services/ai/ai.service");
+
+    let content = await invokeGeneralAgent({
+      userIdentifier: user.id,
+      systemPrompt,
+      input: "请生成 JSON 学习大纲。",
       temperature: 0.5,
-      maxTokens: 1500,
-      jsonMode: true,
-      label: "Outline",
+      tools: [], // 禁用工具调用以减少 token 开销
     });
     console.log(systemPrompt);
     console.log("AI Response:", content);

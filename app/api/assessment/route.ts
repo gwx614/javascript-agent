@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { getPrisma } from "@/lib/core/db";
-import { callAI } from "@/lib/services/ai/chat.service";
 import { STAGES, type StageNode } from "@/lib/core/config";
 import type { AssessmentQuestion } from "@/types";
 
@@ -11,8 +10,6 @@ export async function POST(req: Request) {
     const data = await req.json();
     const username = data.username;
     const selectedCourseId = data.selectedCourseId;
-
-    console.log(`[Assessment] 接收到的请求参数:`, { username, selectedCourseId });
 
     if (!username) {
       return NextResponse.json({ error: "Missing username" }, { status: 400 });
@@ -25,14 +22,6 @@ export async function POST(req: Request) {
 
     const user = await prisma.user.findUnique({
       where: { username },
-    });
-
-    console.log(`[Assessment] 查询用户 ${username}:`, {
-      userFound: !!user,
-      hasRoleReport: !!user?.roleReport,
-      roleReport: user?.roleReport?.substring(0, 50) + "...",
-      rolePosition: user?.rolePosition,
-      skillLevel: user?.skillLevel,
     });
 
     if (!user || !user.roleReport) {
@@ -61,9 +50,6 @@ export async function POST(req: Request) {
         // --- 核心优化：Token 节流与阻塞等待逻辑 ---
         // 如果题目是空数组，说明另一个进程正在生成中
         if (Array.isArray(questions) && questions.length === 0) {
-          console.log(
-            `[Assessment] Race condition detected for ${username}. Waiting for generation...`
-          );
           let attempts = 0;
           const maxAttempts = 20; // 最多等待 15 秒
 
@@ -77,11 +63,9 @@ export async function POST(req: Request) {
             });
 
             if (updatedStage?.preQuestions && updatedStage.preQuestions !== "[]") {
-              console.log(`[Assessment] Generation finished for ${username} after ${attempts}s.`);
               return NextResponse.json({ questions: JSON.parse(updatedStage.preQuestions) });
             }
           }
-          console.log(`[Assessment] Wait timed out for ${username}. Proceeding to re-generate.`);
           // 如果超时了还没有生成，我们允许当前请求通过并触发重新生成（或者是 AI 服务挂了的重试逻辑）
         } else if (Array.isArray(questions) && questions.length > 0) {
           return NextResponse.json({ questions });
@@ -251,23 +235,20 @@ JSON.parse()
 请直接输出 JSON 数组。`;
 
     // (AI Calling logic)
-    let content = await callAI({
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: "请生成 JSON 测试题目。" },
-      ],
+    const { invokeGeneralAgent } = await import("@/lib/services/ai/ai.service");
+
+    let content = await invokeGeneralAgent({
+      userIdentifier: user.id,
+      systemPrompt,
+      input: "请生成 JSON 测试题目。",
       temperature: 0.7,
-      maxTokens: 2500,
-      jsonMode: true,
-      label: "Assessment",
+      tools: [], // 明确禁用工具调用以减少 token 开销
     });
-    console.log(systemPrompt);
 
     content = content
       .replace(/```json/g, "")
       .replace(/```/g, "")
       .trim();
-    console.log("AI Response:", content);
 
     try {
       const parsed = JSON.parse(content);
