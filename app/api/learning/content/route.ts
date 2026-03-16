@@ -126,8 +126,16 @@ export async function POST(req: Request) {
     }
 
     // 4. 使用RAG检索相关知识库内容
-    console.log(`\n🔍 为学习内容生成检索相关知识: "${sectionTitle}"`);
-    const relevantDocs = await retrieveRelevantDocuments(sectionTitle, {
+    console.log(`\n🔍 为学习内容检索相关知识: "${sectionTitle}"`);
+
+    // 适配新的两级大纲结构：支持检索一级菜单或子章节
+    // 如果是子章节，sectionTitle 格式为 "一级菜单标题 > 子章节标题"
+    const isSubSection = sectionTitle.includes(" > ");
+    const searchQuery = isSubSection
+      ? sectionTitle.split(" > ")[1] // 提取子章节标题作为搜索查询
+      : sectionTitle;
+
+    const relevantDocs = await retrieveRelevantDocuments(searchQuery, {
       topK: 3,
       maxContextLength: 6000,
     });
@@ -150,9 +158,6 @@ ${docsContent}
 
 **重要提示**：在生成教程时，请优先参考以上权威技术文档的内容，确保技术准确性。可以结合文档中的示例和解释，但要转化为通俗易懂的教学语言。
 `;
-      console.log(`✅ 成功检索到 ${relevantDocs.length} 个相关文档`);
-    } else {
-      console.log("⚠️  未找到相关文档，将基于通用知识生成");
     }
 
     // 5. 三次迭代：通俗易懂的学霸笔记版 Prompt
@@ -179,7 +184,7 @@ ${knowledgeContext}
 
 # 生成规范 (最高优先级)
 1. 这是用户喜欢的导师风格: ${user.tutorStyle || "未知"}，请以该风格生成文章内容
-2. **“学霸笔记”风格体裁**：文章必须像一份精心整理的、图文并茂的复习笔记。语言要通俗接地气，千万不要像机器翻译的官方文档。采用清晰的层级（如：一、大白话解剖，二、核心对比，三、真实业务演示）。
+2. **“学霸笔记”风格体裁**：文章必须像一份精心整理的、图文并茂的复习笔记。语言要通俗接地气，千万不要像机器翻译的官方文档。采用清晰的层级。
 3. **生动开场与类比**：在解释任何抽象语法前，**必须先用一个极度生活化的通俗比喻**来铺垫。
 4. **图解辅助思维**：不要用干巴巴的文字！凡是涉及到“原理”、“对比”、“状态转移”、“内存流转”的东西，**必须优先输出 Markdown 表格或 ASCII 排版图解**。
 5. **【核心约束】克制的微代码**：
@@ -189,6 +194,7 @@ ${knowledgeContext}
 6. **画龙点睛的排版**：不允许使用任何Emoji（如 📌、💡、⚠️）。
 7. 一定要结合用户的职业定位和学习目标，生成符合对方需求的学习内容。
 8. 这是用户偏好的学习场景（设计需要场景的的内容时优先考虑）: ${Array.isArray(user.preferredScenarios) ? user.preferredScenarios.join("、") : typeof user.preferredScenarios === "string" ? user.preferredScenarios : "未知"}
+9. 可以在笔记末尾为用户推荐相关的学习资源（如：书籍、视频、在线课程等），但不能超过 3 个，同时尽可能是中文或者官方社区的内容。
 
 一句话核心诉求：用最说人话的类比、最一目了然的内容框架，以及贴合对方技术水平、职业方向的微代码，生成一篇阅读体验极佳、内容丰富完善的“高维降维学习笔记”。请直接输出纯 Markdown。`;
 

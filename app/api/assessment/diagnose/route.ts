@@ -75,7 +75,6 @@ export async function POST(req: Request) {
 =========================================
 # 考生上下文
 - 目标课程：【${courseTitle}】
-- 课程目标：${selectedStage?.learningObjective || "无"}
 - 本阶段核心知识点全集：${coreKnowledge.join("、")}
 - 用户角色：${user.rolePosition || "未知"}
 - 技术水平：${user.skillLevel || "beginner"}

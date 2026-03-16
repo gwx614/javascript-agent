@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { BookOpen, PanelLeftClose, Loader2, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -7,7 +8,6 @@ import { cn } from "@/lib/utils";
 import { useUIStore } from "@/store/useUIStore";
 import { useLearningStore } from "@/store/useLearningStore";
 import { useUserStore } from "@/store/useUserStore";
-import { useState } from "react";
 
 function getStatusIcon(status: string, isActive: boolean) {
   // 活跃状态显示一个实心的精致圆点
@@ -52,6 +52,16 @@ export function LearningSidebar() {
   const loadingOutline = currentStageState?.loadingOutline || false;
   const sectionContents = currentStageState?.sectionContents || {};
 
+  // 展开/收起状态
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
+
+  const toggleSection = (sectionId: string) => {
+    setExpandedSections((prev) => ({
+      ...prev,
+      [sectionId]: !prev[sectionId],
+    }));
+  };
+
   const handleSectionClick = async (sectionId: string) => {
     if (!selectedCourseId) return;
 
@@ -60,8 +70,23 @@ export function LearningSidebar() {
     // 如果已有缓存，不再请求
     if (sectionContents[sectionId]) return;
 
-    const section = sections.find((s) => s.id === sectionId);
-    if (!section) return;
+    // 查找对应的章节（可能是子章节）
+    let targetSection = null;
+    for (const section of sections) {
+      if (section.id === sectionId) {
+        targetSection = section;
+        break;
+      }
+      for (const subSection of section.children) {
+        if (subSection.id === sectionId) {
+          targetSection = subSection;
+          break;
+        }
+      }
+      if (targetSection) break;
+    }
+
+    if (!targetSection) return;
 
     useLearningStore.getState().setLoadingContent(selectedCourseId, true);
     useLearningStore.getState().setSectionContent(selectedCourseId, sectionId, ""); // 清空初始内容
@@ -73,10 +98,10 @@ export function LearningSidebar() {
         body: JSON.stringify({
           username: user?.username,
           selectedCourseId,
-          sectionId: section.id, // 明确发送 AI 生成的 ID
-          sectionTitle: section.title,
-          sectionDescription: section.description,
-          sectionStatus: section.status,
+          sectionId: targetSection.id, // 明确发送 AI 生成的 ID
+          sectionTitle: targetSection.title,
+          sectionDescription: targetSection.description,
+          sectionStatus: targetSection.status,
           diagnosisReport,
         }),
       });
@@ -155,10 +180,10 @@ export function LearningSidebar() {
     <aside
       className={cn(
         "relative flex hidden flex-shrink-0 flex-col overflow-hidden border-border bg-card/30 transition-[width,opacity] duration-300 ease-in-out md:flex",
-        isOpen ? "w-64 border-r opacity-100" : "w-0 border-r-0 opacity-0"
+        isOpen ? "w-72 border-r opacity-100" : "w-0 border-r-0 opacity-0"
       )}
     >
-      <div className="absolute inset-0 flex h-full w-64 flex-col">
+      <div className="absolute inset-0 flex h-full w-72 flex-col">
         <div className="flex h-14 flex-shrink-0 items-center justify-between border-b border-border/50 px-5">
           <div className="flex items-center gap-2.5 truncate pr-8">
             <div className="rounded-lg bg-primary/10 p-1.5">
@@ -191,61 +216,122 @@ export function LearningSidebar() {
                 <span className="text-xs">暂无学习内容</span>
               </div>
             ) : (
-              sections.map((section, index) => {
-                const isActive = activeSectionId === section.id;
+              sections.map((section) => {
+                const isSectionActive = activeSectionId === section.id;
+                const isSubSectionActive = section.children.some(
+                  (sub) => activeSectionId === sub.id
+                );
+                const isAnyActive = isSectionActive || isSubSectionActive;
+                const isExpanded = expandedSections[section.id] || isAnyActive;
                 const isSkip = section.status === "skip";
                 const isReinforce = section.status === "reinforce";
 
                 return (
-                  <button
-                    key={section.id}
-                    onClick={() => handleSectionClick(section.id)}
-                    className={cn(
-                      "group flex w-full items-start gap-3 rounded-xl p-2.5 text-left transition-all duration-200",
-                      isActive
-                        ? "bg-primary/5 font-bold text-primary"
-                        : "text-foreground/80 hover:bg-muted/50 hover:text-foreground"
-                    )}
-                  >
-                    <div className="flex h-6 w-5 shrink-0 items-center justify-center">
-                      {getStatusIcon(section.status, isActive)}
-                    </div>
-                    <div className="min-w-0 flex-1 py-0.5">
-                      <div
-                        className={cn(
-                          "break-words text-sm leading-snug transition-colors",
-                          isSkip && !isActive && "font-normal italic opacity-40",
-                          isActive && "text-primary"
-                        )}
-                      >
-                        {section.title}
+                  <div key={section.id} className="space-y-1">
+                    {/* 一级菜单 */}
+                    <button
+                      onClick={() => toggleSection(section.id)}
+                      className={cn(
+                        "group flex w-full items-center gap-3 rounded-xl p-3 text-left transition-all duration-200",
+                        isAnyActive
+                          ? "bg-primary/5 font-bold text-primary"
+                          : "text-foreground/90 hover:bg-muted/50 hover:text-foreground"
+                      )}
+                    >
+                      <div className="flex h-6 w-5 shrink-0 items-center justify-center">
+                        {getStatusIcon(section.status, isAnyActive)}
                       </div>
-
-                      <div className="mt-1 flex items-center gap-1.5">
-                        <span
+                      <div className="min-w-0 flex-1">
+                        <div
                           className={cn(
-                            "text-[10px] font-semibold uppercase tracking-wider opacity-60",
-                            isReinforce
-                              ? "text-amber-600"
-                              : isSkip
-                                ? "text-muted-foreground"
-                                : "text-primary/70"
+                            "break-words text-sm font-bold leading-snug transition-colors",
+                            isSkip && !isAnyActive && "font-normal italic opacity-40",
+                            isAnyActive && "text-primary"
                           )}
                         >
-                          {section.status === "reinforce"
-                            ? "需强化"
-                            : section.status === "skip"
-                              ? "已掌握，可复习"
-                              : "待学习"}
-                        </span>
-                        {isActive && (
-                          <span className="rounded-sm bg-primary/10 px-1 text-[10px] font-medium text-primary">
-                            正在进行
+                          {section.title}
+                        </div>
+                        <div className="mt-1 flex items-center gap-1.5">
+                          <span
+                            className={cn(
+                              "text-[10px] font-semibold uppercase tracking-wider opacity-60",
+                              isReinforce
+                                ? "text-amber-600"
+                                : isSkip
+                                  ? "text-muted-foreground"
+                                  : "text-primary/70"
+                            )}
+                          >
+                            {section.status === "reinforce"
+                              ? "需强化"
+                              : section.status === "skip"
+                                ? "已掌握，可复习"
+                                : "待学习"}
                           </span>
-                        )}
+                          <span className="text-[10px] text-muted-foreground">
+                            ({section.children.length} 小节)
+                          </span>
+                        </div>
                       </div>
+                      <div
+                        className={`transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`}
+                      >
+                        <svg
+                          className="h-4 w-4"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M19 9l-7 7-7-7"
+                          />
+                        </svg>
+                      </div>
+                    </button>
+
+                    {/* 二级菜单 */}
+                    <div
+                      className={`ml-8 space-y-1 overflow-hidden border-l-2 border-border/20 pl-2 transition-all duration-300 ease-in-out ${isExpanded ? "max-h-96 opacity-100" : "max-h-0 opacity-0"}`}
+                    >
+                      {isExpanded &&
+                        section.children.map((subSection) => {
+                          const isSubActive = activeSectionId === subSection.id;
+                          const subIsSkip = subSection.status === "skip";
+                          const subIsReinforce = subSection.status === "reinforce";
+
+                          return (
+                            <button
+                              key={subSection.id}
+                              onClick={() => handleSectionClick(subSection.id)}
+                              className={cn(
+                                "flex w-full items-center gap-3 rounded-lg p-2 text-left transition-all duration-200 hover:translate-x-1",
+                                isSubActive
+                                  ? "bg-primary/5 font-medium text-primary"
+                                  : "text-foreground/70 hover:bg-muted/30 hover:text-foreground"
+                              )}
+                            >
+                              <div className="flex h-5 w-4 shrink-0 items-center justify-center">
+                                {getStatusIcon(subSection.status, isSubActive)}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <div
+                                  className={cn(
+                                    "break-words text-xs leading-snug transition-colors",
+                                    subIsSkip && !isSubActive && "font-normal italic opacity-40",
+                                    isSubActive && "text-primary"
+                                  )}
+                                >
+                                  {subSection.title}
+                                </div>
+                              </div>
+                            </button>
+                          );
+                        })}
                     </div>
-                  </button>
+                  </div>
                 );
               })
             )}

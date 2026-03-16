@@ -140,10 +140,6 @@ export function CourseSelection({ onStart }: { onStart: (stageId: string) => voi
                         </div>
                       </div>
 
-                      <p className="mb-3 text-xs font-medium text-foreground/80 sm:text-sm">
-                        🎯 目标: {stage.learningObjective}
-                      </p>
-
                       <div className="flex flex-wrap gap-1.5">
                         {stage.coreKnowledge.map((k, i) => (
                           <span

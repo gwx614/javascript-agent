@@ -96,6 +96,31 @@ export async function indexDocuments(directory: string): Promise<number> {
 }
 
 /**
+ * 扩展查询，提高简短查询的检索准确性
+ */
+function expandQuery(query: string): string {
+  // 检测是否是数学运算查询
+  const mathOperators = ["%", "+", "-", "*", "/", "**"];
+  const hasMathOperator = mathOperators.some((operator) => query.includes(operator));
+
+  // 检测是否是代码相关查询
+  const codeKeywords = ["js", "javascript", "function", "var", "let", "const", "console"];
+  const hasCodeKeyword = codeKeywords.some((keyword) => query.toLowerCase().includes(keyword));
+
+  // 扩展数学运算查询
+  if (hasMathOperator) {
+    return `JavaScript中${query}的结果是什么 ${query} 运算符 运算结果`;
+  }
+
+  // 扩展代码相关查询
+  if (hasCodeKeyword) {
+    return `JavaScript ${query} 代码示例 用法`;
+  }
+
+  return query;
+}
+
+/**
  * 语义检索相关文档
  */
 export async function retrieveRelevantDocuments(
@@ -105,9 +130,11 @@ export async function retrieveRelevantDocuments(
   try {
     const config = { ...DEFAULT_RAG_OPTIONS, ...options };
 
-    console.log(`\n🔍 RAG 检索: "${query}"`);
+    // 扩展查询以提高检索准确性
+    const expandedQuery = expandQuery(query);
+    console.log(`\n🔍 RAG 检索: "${expandedQuery}"`);
 
-    const queryEmbedding = await generateEmbedding(query);
+    const queryEmbedding = await generateEmbedding(expandedQuery);
     const collection = await getOrCreateCollection();
     const docCount = await collection.count();
 
@@ -131,7 +158,7 @@ export async function retrieveRelevantDocuments(
     });
 
     // 提高相似度阈值，过滤掉不相关的文档
-    const MIN_SIMILARITY = 0.4;
+    const MIN_SIMILARITY = 0.6;
     const filteredResults = results.filter((doc) => {
       const similarity = 1 - doc.distance;
       return similarity >= MIN_SIMILARITY;

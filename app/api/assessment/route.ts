@@ -135,8 +135,6 @@ export async function POST(req: Request) {
 课程信息：
 课程名称：
 ${selectedStage?.title}
-学习目标：
-${selectedStage?.learningObjective}
 本阶段核心知识点（只能从此列表中选择）：
 ${coreKnowledgeStr}
 --------------------------------------------------
@@ -244,7 +242,7 @@ JSON.parse()
 2. 每题 targetKnowledge 必须来自给定列表
 3. 至少包含 2 种不同 conceptType
 4. JSON 格式完全合法
-5. correctAnswers 必须和 options 中的字符串完全一致
+5. correctAnswers 必须和 options 中的字符串完全一致，并且确保并验证正确选项是正确的
 6. 绝对禁止输出任何 markdown 标记（如 \`\`\`json ）
 7. 绝对禁止输出任何解释文字或注释
 8. 绝对禁止输出任何 emoji 表情
@@ -264,12 +262,12 @@ JSON.parse()
       label: "Assessment",
     });
     console.log(systemPrompt);
-    console.log("AI Response:", content);
 
     content = content
       .replace(/```json/g, "")
       .replace(/```/g, "")
       .trim();
+    console.log("AI Response:", content);
 
     try {
       const parsed = JSON.parse(content);

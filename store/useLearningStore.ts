@@ -1,11 +1,19 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 
+export interface SubSection {
+  id: string;
+  title: string;
+  description: string;
+  status: "skip" | "reinforce" | "learn";
+}
+
 export interface LearningSection {
   id: string;
   title: string;
   description: string;
   status: "skip" | "reinforce" | "learn";
+  children: SubSection[];
 }
 
 export interface StageState {

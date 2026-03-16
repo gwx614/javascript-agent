@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { getPrisma } from "@/lib/prisma";
 import { callAI } from "@/lib/ai";
 import { STAGES } from "@/lib/config";
-import type { AssessmentQuestion } from "@/types";
 
 const prisma = getPrisma();
 
@@ -85,7 +84,7 @@ export async function POST(req: Request) {
 
     const selectedStage = STAGES.find((s) => s.id === selectedCourseId);
     const courseInfo = selectedStage
-      ? `课程：${selectedStage.title}\n目标：${selectedStage.learningObjective}\n核心知识点：${selectedStage.coreKnowledge.join("、")}`
+      ? `课程：${selectedStage.title}\n核心知识点：${selectedStage.coreKnowledge.join("、")}`
       : "课程详细信息缺失";
 
     const sectionsInfo =
@@ -120,7 +119,7 @@ export async function POST(req: Request) {
 
 ## 核心出题规范
 1. **职场压迫感 (Role-based Context)**
-   - 绝大多数题目的题干必须是以【你正在负责xxx的具体业务】为开头。
+   - 小部分题目的题干必须是以【你正在负责xxx的具体业务】为开头。
    - 例如：而不是问“闭包是什么”，你要问“你正在开发电商系统的购物车组件，遇到以下代码泄漏问题……” 
    - 用户偏好场景：${Array.isArray(user.preferredScenarios) ? user.preferredScenarios.join("、") : typeof user.preferredScenarios === "string" ? user.preferredScenarios : "未知"}的题目。
    - 用户兴趣爱好：${Array.isArray(user.interestAreas) ? user.interestAreas.join("、") : typeof user.interestAreas === "string" ? user.interestAreas : "未知"}
@@ -148,6 +147,7 @@ export async function POST(req: Request) {
 ]
 
 一定要确保正确选项是随机的，不能固定为 A、B、C、D 中的一个，并且要保证正确选项的分布尽可能平均。
+一定要保证题目的正确性，在输出前验证题目的正确选项是正确的。
 共生成 5 道题。仅输出 JSON 数组，必须能通过 JSON.parse() 解析。
 绝对禁止输出任何 markdown 标记、解释文字、注释或 emoji 表情。`;
 
