@@ -34,6 +34,8 @@ export function cosineSimilarity(vec1: number[], vec2: number[]): number {
   return dotProduct / (magnitude1 * magnitude2);
 }
 
+export { cosineSimilarity as calculateSimilarity };
+
 /**
  * API 错误响应接口
  */

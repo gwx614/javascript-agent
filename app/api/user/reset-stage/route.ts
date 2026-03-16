@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { getPrisma } from "@/lib/prisma";
+export const dynamic = "force-dynamic";
+import { getPrisma } from "@/lib/core/db";
 import { apiError } from "@/lib/utils";
 
 /**

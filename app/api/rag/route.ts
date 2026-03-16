@@ -1,5 +1,4 @@
-import { indexDocuments, checkVectorDBStatus } from "@/lib/rag";
-import { initVectorDB, getSQLiteVectorDB } from "@/lib/rag/vector-db";
+import { indexDocuments, checkVectorDBStatus, getSQLiteVectorDB, initVectorDB } from "@/lib/rag";
 
 export const dynamic = "force-dynamic";
 

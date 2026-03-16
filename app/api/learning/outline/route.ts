@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { getPrisma } from "@/lib/prisma";
-import { callAI } from "@/lib/ai";
-import { STAGES } from "@/lib/config";
+import { getPrisma } from "@/lib/core/db";
+import { callAI } from "@/lib/services/ai/chat.service";
+import { STAGES, type StageNode } from "@/lib/core/config";
 import type { KnowledgePointStatus } from "@/types";
 
 const prisma = getPrisma();
@@ -61,7 +61,7 @@ export async function POST(req: Request) {
 
     // 3. 强制重新生成大纲（移除已有的缓存判断，确保每次都能根据最新诊断生成）
 
-    const selectedStage = STAGES.find((s) => s.id === selectedCourseId);
+    const selectedStage = STAGES.find((s: StageNode) => s.id === selectedCourseId);
     const courseTitle = selectedStage?.title || "未知阶段";
     const coreKnowledge = selectedStage?.coreKnowledge || [];
 
@@ -83,7 +83,9 @@ ${specificWeaknesses}
 角色建议: ${diagnosisReport.roleAdvice || "无"}`;
     }
     // 将 coreKnowledge 列表直接构造为必须生成的小节骨架
-    const knowledgeList = coreKnowledge.map((k, i) => `  ${i + 1}. ${k}`).join("\n");
+    const knowledgeList = coreKnowledge
+      .map((k: string, i: number) => `  ${i + 1}. ${k}`)
+      .join("\n");
 
     const systemPrompt = `
 你是一位经验丰富的 JavaScript 课程架构师与技术导师。

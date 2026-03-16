@@ -2,21 +2,25 @@
  * RAG 模块统一导出
  */
 
-import { getOrCreateCollection } from "./vector-db";
-import { generateEmbedding } from "./embedding";
-import { processDocuments, chunkDocument } from "./document-processor";
+import { getOrCreateCollection } from "@/lib/services/rag/vector-store.service";
+import { generateEmbedding } from "@/lib/services/rag/embedding.service";
+import { processDocuments, chunkDocument } from "@/lib/services/rag/loader.service";
 
-export { generateEmbedding, generateBatchEmbeddings } from "./embedding";
-export { processDocuments, chunkDocument } from "./document-processor";
-export type { DocumentMetadata, ProcessedDocument } from "./document-processor";
+export { generateEmbedding, generateBatchEmbeddings } from "@/lib/services/rag/embedding.service";
+export { processDocuments, chunkDocument } from "@/lib/services/rag/loader.service";
+export type { DocumentMetadata, ProcessedDocument } from "@/lib/services/rag/loader.service";
 export {
   SQLiteVectorDB,
   getSQLiteVectorDB,
   initVectorDB,
   getOrCreateCollection,
   VECTOR_COLLECTION_NAME,
-} from "./vector-db";
-export type { VectorDocument, QueryResult } from "./vector-db";
+} from "@/lib/services/rag/vector-store.service";
+export type { VectorDocument, QueryResult } from "@/lib/services/rag/vector-store.service";
+export { SQLiteLangChainVectorStore } from "@/lib/services/rag/langchain-adapter.service";
+export { createJavascriptSearchTool } from "@/lib/tools/javascript-search.tool";
+export { createWebSearchTool } from "@/lib/tools/web-search.tool";
+export { createDatabaseQueryTool } from "@/lib/tools/db-query.tool";
 
 /**
  * RAG 配置选项
@@ -159,7 +163,7 @@ export async function retrieveRelevantDocuments(
 
     // 提高相似度阈值，过滤掉不相关的文档
     const MIN_SIMILARITY = 0.6;
-    const filteredResults = results.filter((doc) => {
+    const filteredResults = results.filter((doc: any) => {
       const similarity = 1 - doc.distance;
       return similarity >= MIN_SIMILARITY;
     });

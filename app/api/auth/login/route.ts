@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getPrisma } from "@/lib/prisma";
+import { getPrisma } from "@/lib/core/db";
 
 export async function POST(req: Request) {
   try {
@@ -30,6 +30,7 @@ export async function POST(req: Request) {
       {
         message: "登录成功",
         user: {
+          id: user.id,
           username: user.username,
           rolePosition: user.rolePosition,
           roleReport: user.roleReport,

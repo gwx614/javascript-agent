@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/select";
 import { useUserStore } from "@/store/useUserStore";
 import { useLearningStore } from "@/store/useLearningStore";
-import { STAGES } from "@/lib/config";
+import { STAGES, StageNode } from "@/lib/core/config";
 
 export function GlobalHeader() {
   const router = useRouter();
@@ -30,10 +30,11 @@ export function GlobalHeader() {
   const setSelectedCourseId = useUserStore((state) => state.setSelectedCourseId);
   const courseStatus = useUserStore((state) => state.courseStatus);
 
-  const currentStageName = STAGES.find((s) => s.id === selectedCourseId)?.title || "切换阶段";
+  const activeStageName =
+    STAGES.find((s: StageNode) => s.id === selectedCourseId)?.title || "切换阶段";
 
   const handleStageChange = async (stageTitle: string) => {
-    const stage = STAGES.find((s) => s.title === stageTitle);
+    const stage = STAGES.find((s: StageNode) => s.title === stageTitle);
     if (stage) {
       setSelectedCourseId(stage.id);
       useLearningStore.getState().setCurrentStageId(stage.id);
@@ -78,12 +79,12 @@ export function GlobalHeader() {
                 )}
               </div>
               <div className="hidden lg:block">
-                <Select value={currentStageName} onValueChange={handleStageChange}>
+                <Select value={activeStageName} onValueChange={handleStageChange}>
                   <SelectTrigger className="h-8 w-auto gap-1 border-none bg-transparent px-2 text-sm font-bold text-muted-foreground shadow-none transition-colors hover:text-foreground focus:ring-0">
                     <SelectValue placeholder="切换阶段" />
                   </SelectTrigger>
                   <SelectContent className="min-w-[180px]">
-                    {STAGES.map((stage) => (
+                    {STAGES.map((stage: StageNode) => (
                       <SelectItem key={stage.title} value={stage.title}>
                         {stage.title}
                       </SelectItem>

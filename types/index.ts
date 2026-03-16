@@ -7,6 +7,7 @@ export interface Question {
 }
 
 export interface UserProfile {
+  id?: string;
   username?: string;
   rolePosition?: string;
   roleReport?: string;

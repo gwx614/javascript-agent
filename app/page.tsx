@@ -15,7 +15,7 @@ import { PostCourseAssessmentForm } from "@/components/learning/PostCourseAssess
 import { useUIStore } from "@/store/useUIStore";
 import { useUserStore } from "@/store/useUserStore";
 import { useLearningStore } from "@/store/useLearningStore";
-import { STAGES } from "@/lib/config";
+import { STAGES } from "@/lib/core/config";
 
 export default function ChatPage() {
   const user = useUserStore((state) => state.user);
@@ -29,6 +29,13 @@ export default function ChatPage() {
 
   const selectedCourseId = useUserStore((state) => state.selectedCourseId);
   const diagnosisReport = useUserStore((state) => state.diagnosisReport);
+
+  console.log("[ChatPage] 用户数据变化:", {
+    user,
+    isAuthenticated,
+    hasOnboarded,
+    selectedCourseId,
+  });
 
   // 使用阶段特定的评估状态
   const stageAssessed = useUserStore((state) => state.isStageAssessed(state.selectedCourseId));

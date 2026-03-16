@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { STAGES } from "@/lib/config";
+import { STAGES, StageNode } from "@/lib/core/config";
 import { DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useUserStore } from "@/store/useUserStore";
 import { useLearningStore } from "@/store/useLearningStore";
@@ -43,7 +43,7 @@ export function CourseSelection({ onStart }: { onStart: (stageId: string) => voi
 
       <div className="flex-1 space-y-2 overflow-y-auto px-6 pb-10">
         <div className="relative ml-[23px] mt-4 border-l-2 border-primary/20 pb-6">
-          {STAGES.map((stage) => {
+          {STAGES.map((stage: StageNode) => {
             const courseState = getCourseState(stage.id);
             const isSelected = selectedCourseId === stage.id;
 
@@ -141,7 +141,7 @@ export function CourseSelection({ onStart }: { onStart: (stageId: string) => voi
                       </div>
 
                       <div className="flex flex-wrap gap-1.5">
-                        {stage.coreKnowledge.map((k, i) => (
+                        {stage.coreKnowledge.map((k: string, i: number) => (
                           <span
                             key={i}
                             className="rounded-md border border-border/50 bg-background/50 px-2 py-0.5 text-[10px] font-medium text-foreground/70 sm:text-xs"

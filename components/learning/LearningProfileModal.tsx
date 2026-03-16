@@ -4,8 +4,7 @@ import { useState, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Loader2, ArrowRight, BrainCircuit, Sparkles } from "lucide-react";
-import { formQuestions, defaultFormData } from "@/lib/config";
-import { Question } from "@/types";
+import { formQuestions, defaultFormData, Question } from "@/lib/core/config";
 import { CourseSelection } from "./CourseSelection";
 import { useUserStore } from "@/store/useUserStore";
 
@@ -83,7 +82,7 @@ export function LearningProfileModal({ mode, onComplete, onClose }: LearningProf
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(
-          formQuestions.map((q) => ({
+          formQuestions.map((q: Question) => ({
             id: q.id,
             question: q.question,
             answer: (formData as Record<string | number, unknown>)[q.id],
@@ -158,7 +157,7 @@ export function LearningProfileModal({ mode, onComplete, onClose }: LearningProf
   };
 
   const renderField = (field: Question) => {
-    const value = (formData as any)[field.id];
+    const value = (formData as Record<string | number, any>)[field.id];
 
     if (field.type === "select") {
       // 确保 value 是标量值（字符串）
@@ -283,7 +282,7 @@ export function LearningProfileModal({ mode, onComplete, onClose }: LearningProf
 
             <ScrollArea className="flex-1 px-8">
               <div className="space-y-6 pb-8">
-                {formQuestions.map((field, index) => (
+                {formQuestions.map((field: Question, index: number) => (
                   <div
                     key={field.id}
                     className="group space-y-3 rounded-xl border border-border/30 bg-card p-6 shadow-sm"

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { getPrisma } from "@/lib/prisma";
-import { callAI } from "@/lib/ai";
-import { STAGES } from "@/lib/config";
+import { getPrisma } from "@/lib/core/db";
+import { callAI } from "@/lib/services/ai/chat.service";
+import { STAGES, type StageNode } from "@/lib/core/config";
 import type { AssessmentQuestion } from "@/types";
 
 const prisma = getPrisma();
@@ -117,7 +117,7 @@ export async function POST(req: Request) {
     }
 
     // 查找用户选中的课程以提取专属于这节课的测试点
-    const selectedStage = STAGES.find((s) => s.id === selectedCourseId);
+    const selectedStage = STAGES.find((s: StageNode) => s.id === selectedCourseId);
     const coreKnowledgeStr = selectedStage?.coreKnowledge.join("、");
 
     if (!selectedStage) {

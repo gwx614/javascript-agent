@@ -1,4 +1,4 @@
-import { callAI } from "@/lib/ai";
+import { callAI } from "@/lib/services/ai/chat.service";
 import { OnboardingSurveyItem } from "@/types";
 
 interface SurveyData {

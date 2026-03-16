@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { getPrisma } from "@/lib/prisma";
-import { streamAI } from "@/lib/ai";
-import { STAGES } from "@/lib/config";
+import { getPrisma } from "@/lib/core/db";
+import { streamAI } from "@/lib/services/ai/chat.service";
+import { STAGES, type StageNode } from "@/lib/core/config";
 import { retrieveRelevantDocuments } from "@/lib/rag";
 import type { KnowledgePointStatus } from "@/types";
 
@@ -92,7 +92,7 @@ export async function POST(req: Request) {
       });
     }
 
-    const selectedStage = STAGES.find((s) => s.id === selectedCourseId);
+    const selectedStage = STAGES.find((s: StageNode) => s.id === selectedCourseId);
     const courseTitle = selectedStage?.title || "未知阶段";
     const skillLevel = user.skillLevel || "beginner";
 
@@ -145,7 +145,7 @@ export async function POST(req: Request) {
     if (relevantDocs.length > 0) {
       const docsContent = relevantDocs
         .map(
-          (doc, index) =>
+          (doc: any, index: number) =>
             `## 参考资料 ${index + 1}: ${doc.metadata?.title || "技术文档"}\n${doc.content}`
         )
         .join("\n\n");

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { getPrisma } from "@/lib/prisma";
-import { callAI } from "@/lib/ai";
-import { STAGES } from "@/lib/config";
+import { getPrisma } from "@/lib/core/db";
+import { callAI } from "@/lib/services/ai/chat.service";
+import { STAGES } from "@/lib/core/config";
 import type { AssessmentQuestion } from "@/types";
 
 const prisma = getPrisma();

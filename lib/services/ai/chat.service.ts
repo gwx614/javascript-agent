@@ -1,4 +1,4 @@
-import { DEFAULT_MODEL, AI_API_URL, getAIApiKey } from "./client";
+import { DEFAULT_MODEL, AI_API_URL, getAIApiKey } from "@/lib/core/config";
 
 /**
  * 通用 AI 调用函数（非流式）

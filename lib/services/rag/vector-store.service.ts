@@ -5,7 +5,7 @@
 
 import Database from "better-sqlite3";
 import path from "path";
-import { cosineSimilarity } from "../utils";
+import { calculateSimilarity } from "@/lib/utils";
 
 // 数据库文件路径
 const DB_PATH = path.join(process.cwd(), "data", "vector-store.db");
@@ -142,7 +142,7 @@ export class SQLiteVectorDB {
     // 计算相似度并排序
     const results: QueryResult[] = rows.map((row) => {
       const embedding = JSON.parse(row.embedding) as number[];
-      const similarity = cosineSimilarity(queryEmbedding, embedding);
+      const similarity = calculateSimilarity(queryEmbedding, embedding);
 
       return {
         id: row.id,

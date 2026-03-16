@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { getPrisma } from "@/lib/prisma";
-import { callAI } from "@/lib/ai";
-import { STAGES } from "@/lib/config";
+import { getPrisma } from "@/lib/core/db";
+import { callAI } from "@/lib/services/ai/chat.service";
+import { STAGES, type StageNode } from "@/lib/core/config";
 import type { AssessmentQuestion } from "@/types";
 
 const prisma = getPrisma();
@@ -44,8 +44,7 @@ export async function POST(req: Request) {
     }
 
     // 获取选中课程的核心知识点
-    const selectedStage = STAGES.find((s) => s.id === selectedCourseId);
-    const coreKnowledge = selectedStage?.coreKnowledge || [];
+    const selectedStage = STAGES.find((s: StageNode) => s.id === selectedCourseId);
     const courseTitle = selectedStage?.title || "未知阶段";
 
     // 将题目、标准答案、用户答案组装为供 AI 阅卷的文本
@@ -75,7 +74,7 @@ export async function POST(req: Request) {
 =========================================
 # 考生上下文
 - 目标课程：【${courseTitle}】
-- 本阶段核心知识点全集：${coreKnowledge.join("、")}
+- 本阶段核心知识点全集：${(selectedStage?.coreKnowledge || []).join("、")}
 - 用户角色：${user.rolePosition || "未知"}
 - 技术水平：${user.skillLevel || "beginner"}
 - 职业身份：${user.careerIdentity || "未知"}

@@ -77,7 +77,8 @@ export function LearningSidebar() {
         targetSection = section;
         break;
       }
-      for (const subSection of section.children) {
+      const children = section.children || [];
+      for (const subSection of children) {
         if (subSection.id === sectionId) {
           targetSection = subSection;
           break;
@@ -217,10 +218,9 @@ export function LearningSidebar() {
               </div>
             ) : (
               sections.map((section) => {
+                const children = section.children || [];
                 const isSectionActive = activeSectionId === section.id;
-                const isSubSectionActive = section.children.some(
-                  (sub) => activeSectionId === sub.id
-                );
+                const isSubSectionActive = children.some((sub) => activeSectionId === sub.id);
                 const isAnyActive = isSectionActive || isSubSectionActive;
                 const isExpanded = expandedSections[section.id] || isAnyActive;
                 const isSkip = section.status === "skip";
@@ -269,7 +269,7 @@ export function LearningSidebar() {
                                 : "待学习"}
                           </span>
                           <span className="text-[10px] text-muted-foreground">
-                            ({section.children.length} 小节)
+                            ({children.length} 小节)
                           </span>
                         </div>
                       </div>
@@ -297,7 +297,7 @@ export function LearningSidebar() {
                       className={`ml-8 space-y-1 overflow-hidden border-l-2 border-border/20 pl-2 transition-all duration-300 ease-in-out ${isExpanded ? "max-h-96 opacity-100" : "max-h-0 opacity-0"}`}
                     >
                       {isExpanded &&
-                        section.children.map((subSection) => {
+                        children.map((subSection) => {
                           const isSubActive = activeSectionId === subSection.id;
                           const subIsSkip = subSection.status === "skip";
                           const subIsReinforce = subSection.status === "reinforce";
