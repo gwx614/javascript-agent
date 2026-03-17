@@ -1,6 +1,5 @@
 import { Terminal, Database, Code2, Layout, Zap, Globe, Cpu } from "lucide-react";
 import React from "react";
-import { createOpenAI } from "@ai-sdk/openai";
 
 /**
  * 项目核心配置中心
@@ -252,40 +251,9 @@ export const generateDefaultFormData = (): Record<string | number, any> => {
 export const defaultFormData = generateDefaultFormData();
 
 // --- 3. AI 相关配置 ---
+// qwen3.5-flash   qwen-mt-flash   qwen-turbo-latest  qwen-turbo-2025-04-28  qwen-turbo-latest
+export const DEFAULT_MODEL = "qwen-flash-2025-07-28";
 
-const customFetch = async (url: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
-  const targetUrl = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions";
-
-  if (init && init.body && typeof init.body === "string") {
-    try {
-      const body = JSON.parse(init.body);
-      if ("stream_options" in body) delete body.stream_options;
-      if ("input" in body && Array.isArray(body.input)) {
-        body.messages = body.input;
-        delete body.input;
-      }
-      delete body.max_output_tokens;
-      if (body.messages && Array.isArray(body.messages)) {
-        body.messages = body.messages.map((msg: any) => {
-          if (msg.content && Array.isArray(msg.content)) {
-            const textParts = msg.content
-              .filter((part: any) => part.type === "text" || part.type === "input_text")
-              .map((part: any) => part.text)
-              .join("");
-            return { ...msg, content: textParts || " " };
-          }
-          return msg;
-        });
-      }
-      init.body = JSON.stringify(body);
-    } catch (e) {
-      /* ignore */
-    }
-  }
-  return fetch(targetUrl, init);
-};
-
-export const DEFAULT_MODEL = "qwen-turbo";
 export function getAIApiKey() {
   return process.env.DASHSCOPE_API_KEY || process.env.OPENAI_API_KEY || "";
 }

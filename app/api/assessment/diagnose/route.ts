@@ -150,7 +150,6 @@ ${qaText}
       temperature: 0.5,
       tools: [], // 明确禁用工具调用以减少 token 开销
     });
-    console.log(systemPrompt);
     content = content
       .replace(/```json/g, "")
       .replace(/```/g, "")

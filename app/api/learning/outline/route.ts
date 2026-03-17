@@ -253,8 +253,6 @@ JSON结构必须完全符合：
       temperature: 0.5,
       tools: [], // 禁用工具调用以减少 token 开销
     });
-    console.log(systemPrompt);
-    console.log("AI Response:", content);
 
     content = content
       .replace(/```json/g, "")

@@ -113,7 +113,7 @@ export class SQLiteVectorDB {
 
   /**
    * 查询相似向量
-   * 使用余弦相似度计算
+   * 使用余弦相似度计算，支持全量扫描
    */
   async query({
     queryEmbedding,
@@ -126,7 +126,21 @@ export class SQLiteVectorDB {
       await this.init();
     }
 
-    // 获取所有文档
+    const totalCount = await this.count();
+
+    // 小数据量：直接全量扫描
+    if (totalCount <= 1000) {
+      return this.fullScanQuery(queryEmbedding, nResults);
+    }
+
+    // 大数据量：分层检索策略
+    return this.hierarchicalQuery(queryEmbedding, nResults, totalCount);
+  }
+
+  /**
+   * 全量扫描查询
+   */
+  private fullScanQuery(queryEmbedding: number[], nResults: number): QueryResult[] {
     const stmt = this.db!.prepare(`
       SELECT id, content, embedding, metadata
       FROM ${this.collectionName}
@@ -139,7 +153,74 @@ export class SQLiteVectorDB {
       metadata: string;
     }>;
 
-    // 计算相似度并排序
+    return this.calculateAndRankResults(rows, queryEmbedding, nResults);
+  }
+
+  /**
+   * 分层检索查询
+   * 先扫描最近数据，如果质量不够再扫描更早的数据
+   */
+  private async hierarchicalQuery(
+    queryEmbedding: number[],
+    nResults: number,
+    totalCount: number
+  ): Promise<QueryResult[]> {
+    const FIRST_BATCH_SIZE = Math.min(500, Math.floor(totalCount * 0.2));
+    const SIMILARITY_THRESHOLD = 0.7; // 相似度阈值
+
+    // 第一轮：扫描最近的 20% 或 500 条
+    const stmt1 = this.db!.prepare(`
+      SELECT id, content, embedding, metadata
+      FROM ${this.collectionName}
+      ORDER BY created_at DESC
+      LIMIT ?
+    `);
+
+    const rows1 = stmt1.all(FIRST_BATCH_SIZE) as Array<{
+      id: string;
+      content: string;
+      embedding: string;
+      metadata: string;
+    }>;
+
+    const results1 = this.calculateAndRankResults(rows1, queryEmbedding, nResults);
+
+    // 如果找到足够高相似度的结果，直接返回
+    const hasHighQualityResults =
+      results1.length > 0 && results1[0].distance < 1 - SIMILARITY_THRESHOLD;
+
+    if (hasHighQualityResults) {
+      return results1;
+    }
+
+    // 第二轮：扫描剩余数据
+    const stmt2 = this.db!.prepare(`
+      SELECT id, content, embedding, metadata
+      FROM ${this.collectionName}
+      ORDER BY created_at DESC
+      LIMIT ? OFFSET ?
+    `);
+
+    const rows2 = stmt2.all(totalCount - FIRST_BATCH_SIZE, FIRST_BATCH_SIZE) as Array<{
+      id: string;
+      content: string;
+      embedding: string;
+      metadata: string;
+    }>;
+
+    // 合并结果并重新排序
+    const allRows = [...rows1, ...rows2];
+    return this.calculateAndRankResults(allRows, queryEmbedding, nResults);
+  }
+
+  /**
+   * 计算相似度并排序结果
+   */
+  private calculateAndRankResults(
+    rows: Array<{ id: string; content: string; embedding: string; metadata: string }>,
+    queryEmbedding: number[],
+    nResults: number
+  ): QueryResult[] {
     const results: QueryResult[] = rows.map((row) => {
       const embedding = JSON.parse(row.embedding) as number[];
       const similarity = calculateSimilarity(queryEmbedding, embedding);
@@ -148,11 +229,10 @@ export class SQLiteVectorDB {
         id: row.id,
         content: row.content,
         metadata: JSON.parse(row.metadata || "{}"),
-        distance: 1 - similarity, // 转换为距离（越小越相似）
+        distance: 1 - similarity,
       };
     });
 
-    // 按相似度排序并返回前 nResults 个
     results.sort((a, b) => a.distance - b.distance);
     return results.slice(0, nResults);
   }

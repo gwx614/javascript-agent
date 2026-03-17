@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 import { getPrisma } from "@/lib/core/db";
+import { apiError } from "@/lib/utils";
 
 export async function POST(req: Request) {
   try {
     const { username, password } = await req.json();
 
     if (!username || !password) {
-      return NextResponse.json({ error: "请输入用户名和密码" }, { status: 400 });
+      return apiError("请输入用户名和密码", "MISSING_CREDENTIALS", 400);
     }
 
     // 获取 prisma 实例
@@ -18,12 +19,12 @@ export async function POST(req: Request) {
     });
 
     if (!user) {
-      return NextResponse.json({ error: "该账号未注册，请先注册" }, { status: 400 });
+      return apiError("该账号未注册，请先注册", "USER_NOT_FOUND", 400);
     }
 
     // 验证密码 (明文比对)
     if (user.password !== password) {
-      return NextResponse.json({ error: "密码错误" }, { status: 400 });
+      return apiError("密码错误", "INVALID_PASSWORD", 400);
     }
 
     return NextResponse.json(
@@ -50,12 +51,6 @@ export async function POST(req: Request) {
     );
   } catch (error: any) {
     console.error("Login error details:", error);
-    return NextResponse.json(
-      {
-        error: "服务器内部错误，请稍后重试",
-        details: error.message || String(error),
-      },
-      { status: 500 }
-    );
+    return apiError("服务器内部错误，请稍后重试", "SERVER_ERROR", 500, error.message);
   }
 }

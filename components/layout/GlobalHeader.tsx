@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/select";
 import { useUserStore } from "@/store/useUserStore";
 import { useLearningStore } from "@/store/useLearningStore";
+import { useUIStore } from "@/store/useUIStore";
 import { STAGES, StageNode } from "@/lib/core/config";
 
 export function GlobalHeader() {
@@ -38,6 +39,7 @@ export function GlobalHeader() {
     if (stage) {
       setSelectedCourseId(stage.id);
       useLearningStore.getState().setCurrentStageId(stage.id);
+      useUIStore.getState().setCurrentStage(stage.title);
     }
   };
 

@@ -73,10 +73,25 @@ function MessageItem({ message }: MessageItemProps) {
 
 function MessageList({ messages, isLoading }: MessageListProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
+
+  // 监听滚动事件，判断用户是否手动向上滚动
+  const handleScroll = () => {
+    if (!scrollContainerRef.current) return;
+    const { scrollTop, scrollHeight, clientHeight } = scrollContainerRef.current;
+
+    // 扩大判定范围：距离底部 100px 以内认为是在底部，重新锁定自动滚动
+    const isAtBottom = scrollHeight - scrollTop - clientHeight < 100;
+    setShouldAutoScroll(isAtBottom);
+  };
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "auto" });
-  }, [messages, isLoading]);
+    if (shouldAutoScroll && messages.length > 0) {
+      // 使用 behavior: "auto" 确保在流式输出这类高频更新场景下的瞬时准确性
+      bottomRef.current?.scrollIntoView({ behavior: "auto" });
+    }
+  }, [messages, isLoading, shouldAutoScroll]);
 
   if (messages.length === 0) {
     return (
@@ -103,17 +118,25 @@ function MessageList({ messages, isLoading }: MessageListProps) {
   }
 
   return (
-    <div className="flex flex-col py-4">
+    <div
+      ref={scrollContainerRef}
+      onScroll={handleScroll}
+      className="flex h-full flex-col overflow-y-auto py-4"
+    >
       {messages.map((message) => (
         <MessageItem key={message.id} message={message} />
       ))}
 
       {isLoading && (
-        <div className="flex px-4 py-2">
-          <div className="flex items-center gap-1.5 rounded-2xl rounded-tl-sm border border-border/40 bg-muted/30 px-3 py-2">
-            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground/40 [animation-delay:0ms]" />
-            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground/40 [animation-delay:150ms]" />
-            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground/40 [animation-delay:300ms]" />
+        <div className="flex flex-col gap-2 px-4 py-2">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground/70">
+            <Bot className="h-3 w-3 animate-pulse" />
+            <span>JS 小智正在思考并查找资料...</span>
+          </div>
+          <div className="flex w-fit items-center gap-1.5 rounded-2xl rounded-tl-sm border border-border/40 bg-muted/30 px-3 py-2">
+            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary/40 [animation-delay:0ms]" />
+            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary/40 [animation-delay:150ms]" />
+            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary/40 [animation-delay:300ms]" />
           </div>
         </div>
       )}
@@ -211,7 +234,7 @@ export function AiAssistant({
 }: AiAssistantProps) {
   return (
     <aside className={cn("flex flex-col border-l border-border bg-muted/10", className)}>
-      <main className="w-full flex-1 overflow-y-auto">
+      <main className="w-full flex-1 overflow-hidden">
         <MessageList messages={messages} isLoading={isThinking} />
       </main>
 

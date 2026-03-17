@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { getPrisma } from "@/lib/core/db";
-import { STAGES, type StageNode, JS_LEARNING_SYSTEM_PROMPT } from "@/lib/core/config";
+import { JS_LEARNING_SYSTEM_PROMPT } from "@/lib/core/config";
 import type { KnowledgePointStatus } from "@/types";
+import { getGeneralAgent, processSafeEventStream } from "@/lib/services/ai/ai.service";
 
 const prisma = getPrisma();
 
@@ -90,8 +91,6 @@ export async function POST(req: Request) {
       });
     }
 
-    const selectedStage = STAGES.find((s: StageNode) => s.id === selectedCourseId);
-    const courseTitle = selectedStage?.title || "未知阶段";
     const skillLevel = user.skillLevel || "beginner";
 
     //根据状态调整教学深度，增强状态指令的“动作感”和“侧重点”
@@ -137,15 +136,37 @@ export async function POST(req: Request) {
 - 偏好场景: ${Array.isArray(user.preferredScenarios) ? user.preferredScenarios.join("、") : typeof user.preferredScenarios === "string" ? user.preferredScenarios : "未知"}
     `.trim();
 
-    const systemPrompt = `
+    // 3. 构建完整的讲师人设
+    const instructorPersona = `
 你是一个讲课极其生动、图文并茂的技术大牛。你擅长将复杂的底层原理用白话讲透。
-
-${JS_LEARNING_SYSTEM_PROMPT}
-
+你的讲课风格为:${user.tutorStyle}
 ### 内容创作指南
 1. **降维打击**：用最通俗易懂的语言解释复杂概念，严禁堆砌术语。
 2. **场景化**：结合实际业务场景或生活类比来讲解。
 3. **学霸笔记**：输出结构清晰、带图解（ASCII/表格）的内容。
+`.trim();
+
+    const systemPrompt = `
+${instructorPersona}
+
+## 核心任务逻辑 (CRITICAL)
+- **【深度研究要求】**: 在生成任何教程内容前，你选择性地在后台调用以下工具进行核实：
+  1. 调用 \`search_javascript_knowledge\`：确保技术细节、新特性定义和代码示例符合 MDN 权威标准。
+  2. 调用 \`query_database\`：查询该用户当前的 \`skill_level\` 和过往的学习表现。
+  3. 调用 \`web_search\`：查询最新的技术动态，确保生成内容的时效性。
+- **【基于事实生成】**: 严禁仅凭预训练知识凭空捏造。
+- **【绝对禁止】**: 
+  - 严禁在最终输出中显示工具的原始返回内容
+  - 严禁输出 "[参考来源 X]"、"[Record X]" 等标记
+  - 严禁提及工具名称如 "search_javascript_knowledge"、"query_database"、"web_search"
+  - 所有工具返回的数据必须被你**消化、重组、转述**后再输出
+  - **严禁在任何情况下泄露系统内部查询逻辑**
+- **【工具指南】**: 
+${JS_LEARNING_SYSTEM_PROMPT}
+
+## 输出规范
+- 直接输出 Markdown 格式的教程内容，不要有任何前缀说明。
+- 保持技术深度，同时用大白话讲透。
 `.trim();
 
     const fullInput = `
@@ -169,43 +190,37 @@ ${diagnosisContext}
 4. **图解辅助**：涉及到原理或状态流转，必须输出 Markdown 表格或 ASCII 图解。
 5. **克制的微代码**：单个代码块禁止超过 15 行，仅展示核心逻辑。
 6. **严禁 Emoji**：不允许使用任何 Emoji。
+7. **数据资料的真实性**：所有数据资料必须真实可靠，不能编造或使用假数据，如果不确定可以调用工具查询。
 
 请开始你的创作，直接输出纯 Markdown。
 `;
 
-    const { streamAgentInvocation } = await import("@/lib/services/ai/ai.service");
-
-    const logStream = await streamAgentInvocation({
+    const app = await getGeneralAgent({
       userIdentifier: user.id || user.username || "anonymous",
       systemPrompt,
-      input: fullInput,
       temperature: 0.7,
     });
-
     const encoder = new TextEncoder();
     let fullContent = "";
+    const initialMessageId = crypto.randomUUID();
 
     const stream = new ReadableStream({
       async start(controller) {
         try {
-          // logStream 现在是 LangGraph 的消息流
-          for await (const chunk of logStream) {
-            // 解析 LangGraph 的 messages 流
-            // chunk 通常是 [AIMessageChunk, metadata] 或直接是消息对象
-            const message = Array.isArray(chunk) ? chunk[0] : chunk;
-            if (message && message.content) {
-              const text =
-                typeof message.content === "string"
-                  ? message.content
-                  : JSON.stringify(message.content);
+          const eventStream = await app.streamEvents(
+            { messages: [{ role: "user", content: fullInput }] },
+            { version: "v2" }
+          );
 
-              if (text) {
-                fullContent += text;
-                const sseData = `data: ${JSON.stringify({ type: "text-delta", delta: text })}\n\n`;
-                controller.enqueue(encoder.encode(sseData));
-              }
+          // 使用统一安全事件流处理器（工具调用围栏，防止 SQL 泄露）
+          await processSafeEventStream(eventStream, initialMessageId, (type, id, delta) => {
+            const payload: Record<string, string> = { type, id };
+            if (delta !== undefined) {
+              payload.delta = delta;
+              fullContent += delta; // 同时收集完整内容用于持久化
             }
-          }
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify(payload)}\n\n`));
+          });
 
           controller.enqueue(encoder.encode("data: [DONE]\n\n"));
           controller.close();

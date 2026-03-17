@@ -23,11 +23,12 @@ export async function createWebSearchTool() {
           return "未能找到相关搜索结果。";
         }
 
+        // 格式化搜索结果供 LLM 内部使用，不添加来源标记
         const output = results
-          .map((result, i) => {
-            return `[来源 ${i + 1}] ${result.title}\nURL: ${result.url}\n摘要: ${result.snippet}`;
+          .map((result) => {
+            return `${result.title}\n${result.snippet}`;
           })
-          .join("\n\n");
+          .join("\n\n---\n\n");
 
         return output;
       } catch (error) {

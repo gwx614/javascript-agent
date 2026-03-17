@@ -1,20 +1,21 @@
 import { NextResponse } from "next/server";
 import { getPrisma } from "@/lib/core/db";
+import { apiError } from "@/lib/utils";
 
 export async function POST(req: Request) {
   try {
     const { username, password } = await req.json();
 
     if (!username || !password) {
-      return NextResponse.json({ error: "请输入用户名和密码" }, { status: 400 });
+      return apiError("请输入用户名和密码", "MISSING_CREDENTIALS", 400);
     }
 
     if (username.length < 3) {
-      return NextResponse.json({ error: "用户名必须至少为3位" }, { status: 400 });
+      return apiError("用户名必须至少为3位", "INVALID_USERNAME_LENGTH", 400);
     }
 
     if (password.length < 6) {
-      return NextResponse.json({ error: "密码必须至少为6位" }, { status: 400 });
+      return apiError("密码必须至少为6位", "INVALID_PASSWORD_LENGTH", 400);
     }
 
     // 延迟获取 prisma 实例并捕获初始化错误
@@ -26,7 +27,7 @@ export async function POST(req: Request) {
     });
 
     if (existingUser) {
-      return NextResponse.json({ error: "该用户名已被注册" }, { status: 400 });
+      return apiError("该用户名已被注册", "USER_ALREADY_EXISTS", 400);
     }
 
     // 为了简单系统，直接存储明文密码
@@ -61,12 +62,6 @@ export async function POST(req: Request) {
     );
   } catch (error: any) {
     console.error("Register error details:", error);
-    return NextResponse.json(
-      {
-        error: "服务器内部错误，请稍后重试",
-        details: error.message || String(error),
-      },
-      { status: 500 }
-    );
+    return apiError("服务器内部错误，请稍后重试", "SERVER_ERROR", 500, error.message);
   }
 }

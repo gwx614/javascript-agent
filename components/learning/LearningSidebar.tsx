@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { useUIStore } from "@/store/useUIStore";
 import { useLearningStore } from "@/store/useLearningStore";
 import { useUserStore } from "@/store/useUserStore";
+import { STAGES } from "@/lib/core/config";
 
 function getStatusIcon(status: string, isActive: boolean) {
   // 活跃状态显示一个实心的精致圆点
@@ -35,6 +36,7 @@ export function LearningSidebar() {
   const isOpen = useUIStore((state) => state.isSidebarOpen);
   const setSidebarOpen = useUIStore((state) => state.setSidebarOpen);
   const stageTitle = useUIStore((state) => state.currentStage);
+  const setCurrentStage = useUIStore((state) => state.setCurrentStage);
 
   const user = useUserStore((state) => state.user);
   const setHasCompletedCourse = useUserStore((state) => state.setHasCompletedCourse);
@@ -42,6 +44,12 @@ export function LearningSidebar() {
   const selectedCourseId = useUserStore((state) => state.selectedCourseId);
   const setCourseStatus = useUserStore((state) => state.setCourseStatus);
   const diagnosisReport = useUserStore((state) => state.diagnosisReport);
+
+  // 监听 selectedCourseId 变化，更新侧边栏标题
+  const currentStageTitle = STAGES.find((s) => s.id === selectedCourseId)?.title;
+  if (currentStageTitle && currentStageTitle !== stageTitle) {
+    setCurrentStage(currentStageTitle);
+  }
 
   // 直接访问store中的状态，避免使用getStageState导致的引用问题
   const stageStates = useLearningStore((state) => state.stageStates);
@@ -167,8 +175,7 @@ export function LearningSidebar() {
           .replace(/\n?```$/i, "")
           .trim()
       );
-    } catch (err) {
-      console.error("Failed to stream content:", err);
+    } catch {
       useLearningStore
         .getState()
         .setSectionContent(selectedCourseId, sectionId, "⚠️ 生成教程内容失败，请稍后重试。");

@@ -23,7 +23,9 @@ export function LearningContent() {
   const sectionContents = currentStageState?.sectionContents || {};
   const loadingContent = currentStageState?.loadingContent || false;
 
-  const activeSection = sections.find((s) => s.id === activeSectionId);
+  // 扁平化所有章节（包括一级和子章节），用于查找 activeSection
+  const allSections = sections.flatMap((s) => [s, ...(s.children || [])]);
+  const activeSection = allSections.find((s) => s.id === activeSectionId);
   const markdownContent = activeSectionId ? sectionContents[activeSectionId] : null;
 
   return (

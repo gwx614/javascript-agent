@@ -1,4 +1,5 @@
 import { OnboardingSurveyItem } from "@/types";
+import { apiError } from "@/lib/utils";
 
 interface SurveyData {
   id: string | number;
@@ -99,8 +100,6 @@ export async function POST(req: Request) {
           `问题${item.id}: ${item.question}\n回答: ${Array.isArray(item.answer) ? item.answer.join("、") : item.answer}`
       )
       .join("\n\n");
-    console.log("[Onboarding] 问卷上下文:", promptContext);
-    console.log("[Onboarding] 提取的用户画像:", extractedProfile);
 
     const systemPrompt = `你是一个资深的 JavaScript 导师。
     根据用户提交的详细学习情况调研问卷，请直接为该用户生成一个准确的【专属角色定位】。
@@ -145,9 +144,6 @@ export async function POST(req: Request) {
     });
   } catch (error: any) {
     console.error("Onboarding endpoint error:", error);
-    return new Response(JSON.stringify({ error: "分析生成失败，请稍后重试" }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" },
-    });
+    return apiError("分析生成失败，请稍后重试", "ANALYSIS_FAILED", 500, error.message);
   }
 }

@@ -49,9 +49,8 @@ export function RagManager() {
       const data = await response.json();
       setStatus(data);
       setError(null);
-    } catch (err) {
+    } catch {
       setError("获取RAG状态失败");
-      console.error("获取RAG状态失败:", err);
     }
   };
 
@@ -66,8 +65,8 @@ export function RagManager() {
         setTotal(data.total);
         setCurrentPage(page);
       }
-    } catch (err) {
-      console.error("获取文档列表失败:", err);
+    } catch {
+      // 获取失败时静默处理
     } finally {
       setIsLoadingDocs(false);
     }
@@ -100,9 +99,8 @@ export function RagManager() {
       } else {
         setError(data.message);
       }
-    } catch (err) {
+    } catch {
       setError("索引文档失败");
-      console.error("索引文档失败:", err);
     } finally {
       setIsIndexing(false);
     }

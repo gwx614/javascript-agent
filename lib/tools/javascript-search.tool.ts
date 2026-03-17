@@ -38,16 +38,17 @@ export async function createJavascriptSearchTool() {
           return "在知识库中未找到相关内容。";
         }
 
+        // 格式化检索结果供 LLM 内部使用，不添加任何标记
         const output = results
-          .map((doc, i) => {
+          .map((doc) => {
             // 对每个文档内容进行截断，防止上下文过长导致 LLM 无法处理
             const content =
               doc.pageContent.length > 5000
                 ? doc.pageContent.substring(0, 5000) + "...(内容过长已截断)"
                 : doc.pageContent;
-            return `[参考来源 ${i + 1}: ${doc.metadata.title || "未知"}]\n${content}`;
+            return content;
           })
-          .join("\n\n");
+          .join("\n\n---\n\n");
 
         return output;
       } catch (error) {

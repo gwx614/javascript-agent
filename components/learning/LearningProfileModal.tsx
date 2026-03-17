@@ -47,8 +47,8 @@ export function LearningProfileModal({ mode, onComplete, onClose }: LearningProf
     if (saved) {
       try {
         setFormData(JSON.parse(saved));
-      } catch (e) {
-        console.error("Failed to parse learningProfile", e);
+      } catch {
+        // 解析失败时忽略
       }
     }
 
@@ -76,8 +76,6 @@ export function LearningProfileModal({ mode, onComplete, onClose }: LearningProf
     localStorage.setItem("learningProfile", JSON.stringify(formData));
 
     try {
-      console.log("[Onboarding] 开始调用 /api/onboarding，发送问卷数据:", formData);
-
       const res = await fetch("/api/onboarding", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -90,7 +88,6 @@ export function LearningProfileModal({ mode, onComplete, onClose }: LearningProf
         ),
       });
       const data = await res.json();
-      console.log("[Onboarding] /api/onboarding 返回数据:", data);
 
       if (data.report) {
         setReport(data.report);
@@ -102,11 +99,7 @@ export function LearningProfileModal({ mode, onComplete, onClose }: LearningProf
         // Save to Database
         if (user?.username) {
           try {
-            // 从 API 返回的 profile 数据中提取用户画像信息
             const profile = data.profile || {};
-
-            console.log("[Onboarding] 开始保存用户画像到数据库，用户名:", user.username);
-            console.log("[Onboarding] 保存的 profile 数据:", profile);
 
             const saveRes = await fetch("/api/user/profile", {
               method: "POST",
@@ -116,7 +109,6 @@ export function LearningProfileModal({ mode, onComplete, onClose }: LearningProf
                 rolePosition: extractedRole,
                 roleReport: data.report,
                 skillLevel: profile.skillLevel || "beginner",
-                // 新增用户画像字段
                 careerIdentity: profile.careerIdentity,
                 experienceLevel: profile.experienceLevel,
                 learningGoal: profile.learningGoal,
@@ -130,18 +122,16 @@ export function LearningProfileModal({ mode, onComplete, onClose }: LearningProf
               }),
             });
             const saveData = await saveRes.json();
-            console.log("[Onboarding] 数据库保存结果:", saveData);
 
             if (saveData.success) {
-              // Update Zustand User Store
               updateUser({
                 rolePosition: extractedRole,
                 roleReport: data.report,
                 skillLevel: profile.skillLevel || "beginner",
               });
             }
-          } catch (e) {
-            console.error("Failed to save profile to DB", e);
+          } catch {
+            // 保存失败时静默处理
           }
         }
       } else {

@@ -39,8 +39,8 @@ export function FinalLearningReport({
             courseId: selectedCourseId,
           }),
         });
-      } catch (e) {
-        console.error("Failed to reset database stage", e);
+      } catch {
+        // 重置失败时静默处理
       }
     }
 

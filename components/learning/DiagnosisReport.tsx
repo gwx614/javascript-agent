@@ -319,10 +319,7 @@ export function DiagnosisReport({ report, questions = [], onStartLearning }: Dia
         <div className="relative z-10 flex shrink-0 items-center justify-between border-t bg-card px-6 py-4 shadow-[0_-4px_12px_rgba(0,0,0,0.03)]">
           <p className="text-xs text-muted-foreground">以上内容由 AI 根据你的答题情况智能生成</p>
           <Button
-            onClick={() => {
-              console.log("Start Learning clicked");
-              onStartLearning();
-            }}
+            onClick={() => onStartLearning()}
             size="lg"
             className="h-11 rounded-xl px-10 font-bold shadow-lg shadow-primary/25 transition-all hover:scale-[1.02] active:scale-[0.98]"
           >

@@ -18,7 +18,6 @@ interface AssessmentQuestion {
   hasCode: boolean;
   codeBlock: string;
   options: string[];
-  // 兼容旧字段
   question?: string;
 }
 
@@ -34,11 +33,9 @@ export function AssessmentForm() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // 诊断报告（本地视图状态），优先使用 store 中持久化的结果以支持断点续传
   const storeDiagnosisReport = useUserStore((state) => state.diagnosisReport);
   const [report, setReport] = useState<DiagnosisReportType | null>(storeDiagnosisReport);
 
-  // 监听持久化的 store 变化，如果有了报告也要及时更新本地视图，如果清空了也要跟着清空
   useEffect(() => {
     setReport(storeDiagnosisReport);
   }, [storeDiagnosisReport]);
@@ -47,14 +44,7 @@ export function AssessmentForm() {
     let ignore = false;
 
     async function loadQuestions() {
-      // 如果已经有缓存的报告了，说明已经测完了，不需要再去拉题目
       if (!user?.username || report) return;
-
-      console.log(`[AssessmentForm] 开始加载题目`, {
-        username: user.username,
-        selectedCourseId,
-        hasReport: !!report,
-      });
 
       try {
         setLoading(true);
@@ -64,7 +54,6 @@ export function AssessmentForm() {
           body: JSON.stringify({ username: user.username, selectedCourseId }),
         });
         const data = await res.json();
-        console.log(`[AssessmentForm] API 返回结果:`, data);
 
         if (!ignore) {
           if (data.error) {
@@ -73,8 +62,7 @@ export function AssessmentForm() {
             setQuestions(data.questions || []);
           }
         }
-      } catch (err) {
-        console.error(`[AssessmentForm] 加载题目失败:`, err);
+      } catch {
         if (!ignore) {
           setError("获取摸底题目失败，请刷新重试。");
         }
@@ -108,7 +96,6 @@ export function AssessmentForm() {
   };
 
   const handleSubmit = async () => {
-    // 验证
     const unanswered = questions.filter((q) => {
       const ans = answers[q.id];
       return !ans || (Array.isArray(ans) && ans.length === 0);
@@ -141,7 +128,7 @@ export function AssessmentForm() {
           useUserStore.getState().setCourseStatus(selectedCourseId, "PRE_REPORT");
         }
       }
-    } catch (err) {
+    } catch {
       alert("提交诊断失败，请重试。");
     } finally {
       setSubmitting(false);
@@ -149,14 +136,8 @@ export function AssessmentForm() {
   };
 
   const handleStartLearning = async () => {
-    console.log("handleStartLearning triggered", { selectedCourseId });
-    if (!selectedCourseId || !user?.username) {
-      console.error("Missing selectedCourseId or user in handleStartLearning");
-      return;
-    }
+    if (!selectedCourseId || !user?.username) return;
 
-    // 关键修复：除了设置前端UI跳过测验页的本地状态，还必须向后端明确声明：
-    // “该用户结束课前诊断阶段，进入请求生成大纲（STUDY_OUTLINE）的状态流水线”
     try {
       await fetch("/api/user/sync-stage", {
         method: "POST",
@@ -164,19 +145,16 @@ export function AssessmentForm() {
         body: JSON.stringify({
           username: user.username,
           courseId: selectedCourseId,
-          newStage: "STUDY_OUTLINE", // 推动后端状态机过河
+          newStage: "STUDY_OUTLINE",
         }),
       });
-      // 告诉页面可以进入左侧双栏的正常学习形态了
       useUserStore.getState().setStageAssessed(selectedCourseId, true);
       useUserStore.getState().setCourseStatus(selectedCourseId, "STUDY_OUTLINE");
-      console.log("Stage advanced to STUDY_OUTLINE and assessed state flag set.");
-    } catch (err) {
-      console.error("Failed to sync stage transition", err);
+    } catch {
+      // 静默处理错误
     }
   };
 
-  // ========== 如果已经有诊断报告了，展示报告页 ==========
   if (report) {
     return (
       <DiagnosisReport
@@ -187,7 +165,6 @@ export function AssessmentForm() {
     );
   }
 
-  // ========== 加载中 ==========
   if (loading) {
     return (
       <div className="flex h-full w-full flex-col items-center justify-center bg-background/50">
@@ -199,7 +176,6 @@ export function AssessmentForm() {
     );
   }
 
-  // ========== 错误 ==========
   if (error) {
     return (
       <div className="flex h-full w-full flex-col items-center justify-center">
@@ -209,7 +185,6 @@ export function AssessmentForm() {
     );
   }
 
-  // ========== 没有题目 ==========
   if (questions.length === 0) {
     return (
       <div className="flex h-full w-full flex-col items-center justify-center">
@@ -304,7 +279,9 @@ export function AssessmentForm() {
                             <Checkbox
                               id={`${q.id}-${i}`}
                               checked={isChecked}
-                              onCheckedChange={(c) => handleCheckboxChange(q.id, opt, c as boolean)}
+                              onCheckedChange={(checked) =>
+                                handleCheckboxChange(q.id, opt, checked as boolean)
+                              }
                             />
                             <Label
                               htmlFor={`${q.id}-${i}`}
@@ -323,19 +300,24 @@ export function AssessmentForm() {
           </div>
         </ScrollArea>
 
-        <div className="flex shrink-0 justify-end border-t bg-muted/5 px-6 py-3">
+        <div className="flex shrink-0 items-center justify-end gap-4 border-t bg-card/50 px-8 py-5">
+          <div className="text-sm text-muted-foreground">
+            已完成 {Object.keys(answers).length} / {questions.length} 题
+          </div>
           <Button
             onClick={handleSubmit}
             disabled={submitting}
-            className="h-10 rounded-xl px-8 font-bold shadow-md shadow-primary/20"
+            className="min-w-[140px] gap-2 font-bold"
           >
             {submitting ? (
               <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> AI 正在分析你的答卷...
+                <Loader2 className="h-4 w-4 animate-spin" />
+                提交中...
               </>
             ) : (
               <>
-                提交测试 <ArrowRight className="ml-2 h-4 w-4" />
+                提交并查看报告
+                <ArrowRight className="h-4 w-4" />
               </>
             )}
           </Button>

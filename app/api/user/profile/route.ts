@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getPrisma } from "@/lib/core/db";
+import { apiError } from "@/lib/utils";
 import type { Prisma } from "@prisma/client";
 
 export async function POST(req: Request) {
@@ -86,10 +87,7 @@ export async function POST(req: Request) {
     });
   } catch (error: any) {
     console.error("Save profile error:", error);
-    return NextResponse.json(
-      { error: "无法保存用户设置", details: error.message },
-      { status: 500 }
-    );
+    return apiError("无法保存用户设置", "PROFILE_UPDATE_FAILED", 500, error.message);
   }
 }
 
@@ -111,7 +109,7 @@ export async function GET(req: Request) {
     });
 
     if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+      return apiError("用户不存在", "USER_NOT_FOUND", 404);
     }
 
     // 解析 JSON 字段
@@ -151,9 +149,6 @@ export async function GET(req: Request) {
     });
   } catch (error: any) {
     console.error("Get profile error:", error);
-    return NextResponse.json(
-      { error: "无法获取用户信息", details: error.message },
-      { status: 500 }
-    );
+    return apiError("无法获取用户信息", "PROFILE_FETCH_FAILED", 500, error.message);
   }
 }

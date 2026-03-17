@@ -2,7 +2,8 @@ import { JS_LEARNING_SYSTEM_PROMPT } from "@/lib/core/config";
 import { HumanMessage, AIMessage } from "@langchain/core/messages";
 import { getPrisma } from "@/lib/core/db";
 import type { ChatMessagePayload } from "@/types";
-import { unwrapToolInput } from "@/lib/core/utils";
+import { apiError } from "@/lib/utils";
+import { processSafeEventStream } from "@/lib/services/ai/ai.service";
 
 /**
  * 流式对话 API 路由
@@ -25,8 +26,8 @@ export async function POST(req: Request) {
         const headerUser = JSON.parse(decodeURIComponent(userHeader));
         // body 优先，但 header 作为备份或补充
         user = user || headerUser;
-      } catch (e) {
-        console.error("Failed to parse user header", e);
+      } catch {
+        // 解析失败时忽略
       }
     }
 
@@ -55,54 +56,68 @@ export async function POST(req: Request) {
       throw new Error("No messages provided");
     }
 
-    // 构建系统提示词
-    // 1. 定义聊天场景专属人设 (Persona)
-    const chatPersona = `你是一位专业的 JavaScript 金牌导师。
-针对不同的学习者，你擅长：
+    // =========================================================
+    // 结构化构建系统提示词 (Prompt Engineering)
+    // =========================================================
+
+    // 1. 核心身份与人设 (Identity)
+    const chatPersona = `## 你的身份
+你是一位专业的 JavaScript 金牌导师，目前的教学风格是：【${user?.tutorStyle || "专业、耐心、富有亲和力"}】。
+你的目标是引导用户掌握 JavaScript 核心技能，通过启发式教学而非直接灌输。
+
+## 教学互动标准
 - **由浅入深**：将复杂的概念拆解为易读的小块知识。
-- **循循善诱**：多提问引导用户思考，而非直接给出所有答案。
-- **情感支持**：在用户遇到挫折时给予鼓励，庆祝他们的每一个小进步。
+- **循循善诱**：多提问引导用户思考，而非直接给出答案。
+- **情感支持**：鼓励为主，庆祝用户的每一个小进步。`;
 
-你的语气应该是：${user?.tutorStyle || "专业、耐心、富有亲和力"}。`;
+    // 2. 核心约束与安全 (Constraints)
+    const safetyDirectives = `## 🔒 行为准则 (CRITICAL)
+- **【隐藏内部细节】**: 严禁提及任何技术实现细节（如数据库、SQL 语句、查询过程、内部表名或字段名）。
+- **【禁止内部 ID】**: 严禁在回复中输出任何用户 ID、记录 ID 等内部标识符。
+- **【自然语言交互】**: 所有的工具返回结果必须转述为自然、亲切的导师口吻，直接给出结论而非展示数据原文。`;
 
-    // 2. 引入通用的工具指南 (从 config.ts 获取)
-    let baseSystemPrompt = `${chatPersona}\n\n${JS_LEARNING_SYSTEM_PROMPT}`;
+    // 3. 用户上下文 (Context)
+    let userContext = `## 用户画像与当前状态
+- **职业/身份**: ${user?.careerIdentity || "初级开发者"}
+- **编程经验**: ${user?.experienceLevel || "初步接触"}
+- **当前进度/角色**: ${user?.rolePosition || "JavaScript 学习者"}
+- **核心目标**: ${user?.learningGoal || "掌握前端开发"}
+- **兴趣偏好**: ${Array.isArray(user?.interestAreas) ? user?.interestAreas.join("、") : "通用技术"}
+- **当前水平**: ${user?.targetLevel || "入门级"}
+- **学习时间**: ${user?.weeklyStudyTime || "未设定"}
+- **补充说明**: ${user?.additionalNotes || "无"}`;
 
-    // 3. 注入用户专属的角色定位
-    if (user?.rolePosition) {
-      baseSystemPrompt += `\n\n## 当前教学策略调整
-你当前的教学对象是一位：【${user.rolePosition}】。请严格根据此定位调整你的口吻、辅导方式和交流深度。`;
-    }
+    // 4. 输出规范与自查
+    const outputValidation = `## 输出规范 (CRITICAL)
+- **【自然语言转述】**: 获取数据后，必须以导师口吻直接给出结论，如"根据你的学习记录，你目前..."
+- **【禁止中间过程】**: 严禁说"正在查询"、"让我查一下"等过渡语句。
+- **【最终检查】**: 输出前必须自检，确保没有 SQL、没有技术术语、没有内部 ID。`;
 
-    // 2. 注入用户画像详细信息 (如果存在)
-    if (user) {
-      baseSystemPrompt += `\n\n## 用户画像信息
-- 职业身份: ${user.careerIdentity || "未知"}
-- 编程经验: ${user.experienceLevel || "未知"}
-- 学习目标: ${user.learningGoal || "未知"}
-- 兴趣领域: ${Array.isArray(user.interestAreas) ? user.interestAreas.join("、") : typeof user.interestAreas === "string" ? user.interestAreas : "未知"}
-- 偏好场景: ${Array.isArray(user.preferredScenarios) ? user.preferredScenarios.join("、") : typeof user.preferredScenarios === "string" ? user.preferredScenarios : "未知"}
-- 目标水平: ${user.targetLevel || "未知"}
-- 每周学习时间: ${user.weeklyStudyTime || "未知"}
-- 补充说明: ${user.additionalNotes || "无"}`;
-    }
+    // 合并提示词
+    const baseSystemPrompt = `
+${chatPersona}
 
-    // 开发环境下尝试获取一个真实用户作为 fallback，避免 anonymous 导致的工具查询为空
+${safetyDirectives}
+
+${userContext}
+
+${outputValidation}
+
+## 工具使用与响应指南
+${JS_LEARNING_SYSTEM_PROMPT}
+`.trim();
+
+    // =========================================================
+    // 环境与用户身份确认
+    // =========================================================
+
+    // 开发环境下尝试获取一个真实用户作为 fallback，确保工具可用
     let userIdentifier = user?.id || user?.username;
     if (!userIdentifier) {
       const fallbackUser = await getPrisma().user.findFirst({
         orderBy: { updatedAt: "desc" },
       });
-      if (fallbackUser) {
-        userIdentifier = fallbackUser.id;
-      } else {
-        userIdentifier = "anonymous";
-      }
-    }
-
-    // 如果没有有效用户标识,警告但继续
-    if (userIdentifier === "anonymous") {
-      console.warn("[ChatRoute] 警告: 未找到有效用户标识,将使用 anonymous 进行查询");
+      userIdentifier = fallbackUser?.id || "anonymous";
     }
 
     // 初始化通用 Agent
@@ -111,7 +126,7 @@ export async function POST(req: Request) {
     const app = await getGeneralAgent({
       userIdentifier,
       systemPrompt: baseSystemPrompt,
-      temperature: 0.3, // 降低随机性，使 Agent 更倾向于使用搜索结果
+      temperature: 0.3,
       streaming: true,
     });
 
@@ -133,41 +148,12 @@ export async function POST(req: Request) {
             { version: "v2" }
           );
 
-          for await (const event of eventStream) {
-            const eventType = event.event;
-
-            // 处理模型生成的文字增量 (LangGraph event)
-            if (eventType === "on_chat_model_stream") {
-              const content = event.data.chunk.content;
-              if (content) {
-                controller.enqueue(
-                  encoder.encode(
-                    `data: ${JSON.stringify({
-                      type: "text-delta",
-                      id: messageId,
-                      delta: content,
-                    })}\n\n`
-                  )
-                );
-              }
-            } else if (eventType === "on_tool_start") {
-              const input = event.data.input;
-              const name = event.name;
-              const unwrapInput = unwrapToolInput(input);
-              console.log(`\x1b[36m[Agent Tool Call]\x1b[0m 正在调用: ${name}`);
-              console.log(
-                `\x1b[90m[Input]\x1b[0m ${
-                  typeof unwrapInput === "string" ? unwrapInput : JSON.stringify(unwrapInput)
-                }`
-              );
-            } else if (eventType === "on_tool_end") {
-              const output = event.data.output;
-              const content = typeof output === "string" ? output : output?.content || "";
-              console.log(
-                `\x1b[32m[Tool Result]\x1b[0m ${event.name} 执行完毕，获取到约 ${content.length} 字符数据。`
-              );
-            }
-          }
+          // 🔒 使用统一的安全事件流处理器处理工具调用围栏
+          await processSafeEventStream(eventStream, messageId, (type, id, delta) => {
+            const payload: Record<string, string> = { type, id };
+            if (delta !== undefined) payload.delta = delta;
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify(payload)}\n\n`));
+          });
 
           // 发送结束信号
           controller.enqueue(
@@ -192,9 +178,6 @@ export async function POST(req: Request) {
     });
   } catch (error: any) {
     console.error("[Chat API Error]:", error);
-    return new Response(JSON.stringify({ error: "Agent 服务暂时不可用" }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" },
-    });
+    return apiError("Agent 服务暂时不可用", "AGENT_SERVICE_ERROR", 500, error.message);
   }
 }
