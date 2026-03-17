@@ -4,7 +4,7 @@
 // ============================================================
 
 generator client {
-  provider   = "prisma-client-js"
+  provider = "prisma-client-js"
 }
 
 datasource db {
@@ -16,6 +16,7 @@ datasource db {
 // 存储学习用户的基本信息和学习偏好
 // ============================================================
 model User {
+  @@map("users")
   id        String   @id @default(cuid())
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -54,8 +55,6 @@ model User {
   // 关联
   chatSessions ChatSession[]
   courseStages CourseStage[]
-
-  @@map("users")
 }
 
 // ============================================================

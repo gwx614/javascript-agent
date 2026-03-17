@@ -105,13 +105,15 @@ export const useUserStore = create<UserState>()(
         // 他在前端也不应该进入左侧大纲区（因为还没点"开始学习"）。
         // 因此只有在明确离开 PRE_REPORT 之后才算 "Assessed=true" 并放行到大纲区。
         const isAssessed = !["PRE_ASSESSMENT", "PRE_REPORT"].includes(data.status);
+        const isCompleted = ["POST_ASSESSMENT", "POST_REPORT", "COMPLETED"].includes(data.status);
+
         set({
           stageAssessed: {
             ...get().stageAssessed,
             [courseId]: isAssessed,
           },
           diagnosisReport: data.preReport,
-          hasCompletedCourse: ["POST_ASSESSMENT", "POST_REPORT", "COMPLETED"].includes(data.status),
+          hasCompletedCourse: isCompleted,
           finalReport: data.postReport,
           courseStatus: {
             ...get().courseStatus,

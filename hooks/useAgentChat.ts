@@ -29,7 +29,8 @@ export function useAgentChat(user: Record<string, any> | null) {
             }
           : undefined,
         body: {
-          user: user, // 同时在 body 中也传一份作为备份
+          user: user,
+          userId: user?.id, // 关键：显式传递 userId 供后端校验
         },
       }
     );

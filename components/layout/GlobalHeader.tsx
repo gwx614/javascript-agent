@@ -16,7 +16,8 @@ import {
 import { useUserStore } from "@/store/useUserStore";
 import { useLearningStore } from "@/store/useLearningStore";
 import { useUIStore } from "@/store/useUIStore";
-import { STAGES, StageNode } from "@/lib/core/config";
+import { STAGES } from "@/lib/core/config";
+import { type StageNode } from "@/types";
 
 export function GlobalHeader() {
   const router = useRouter();

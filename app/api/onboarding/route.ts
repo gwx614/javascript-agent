@@ -1,4 +1,3 @@
-import { OnboardingSurveyItem } from "@/types";
 import { apiError } from "@/lib/utils";
 
 interface SurveyData {

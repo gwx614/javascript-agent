@@ -10,6 +10,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { DiagnosisReport } from "./DiagnosisReport";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { useConfirmDialog } from "@/hooks/useConfirmDialog";
 
 interface AssessmentQuestion {
   id: string;
@@ -26,6 +28,7 @@ export function AssessmentForm() {
   const selectedCourseId = useUserStore((state) => state.selectedCourseId);
   const setStageAssessed = useUserStore((state) => state.setStageAssessed);
   const setDiagnosisReport = useUserStore((state) => state.setDiagnosisReport);
+  const { dialogState, closeDialog, showWarning, showError } = useConfirmDialog();
 
   const [questions, setQuestions] = useState<AssessmentQuestion[]>([]);
   const [answers, setAnswers] = useState<Record<string, string | string[]>>({});
@@ -102,7 +105,10 @@ export function AssessmentForm() {
     });
 
     if (unanswered.length > 0) {
-      alert("请先完成所有题目再提交哦！");
+      showWarning(
+        "还有未完成的题目",
+        `你还有 ${unanswered.length} 道题目未完成，请先完成所有题目再提交哦！`
+      );
       return;
     }
 
@@ -120,7 +126,7 @@ export function AssessmentForm() {
       });
       const data = await res.json();
       if (data.error) {
-        alert(data.error);
+        showError("提交失败", data.error);
       } else if (data.report) {
         setReport(data.report);
         setDiagnosisReport(data.report);
@@ -129,7 +135,7 @@ export function AssessmentForm() {
         }
       }
     } catch {
-      alert("提交诊断失败，请重试。");
+      showError("提交失败", "提交诊断失败，请重试。");
     } finally {
       setSubmitting(false);
     }
@@ -157,11 +163,24 @@ export function AssessmentForm() {
 
   if (report) {
     return (
-      <DiagnosisReport
-        report={report}
-        questions={questions}
-        onStartLearning={handleStartLearning}
-      />
+      <>
+        <DiagnosisReport
+          report={report}
+          questions={questions}
+          onStartLearning={handleStartLearning}
+        />
+        <ConfirmDialog
+          isOpen={dialogState.isOpen}
+          onClose={closeDialog}
+          onConfirm={dialogState.onConfirm}
+          title={dialogState.title}
+          description={dialogState.description}
+          type={dialogState.type}
+          confirmText={dialogState.confirmText}
+          cancelText={dialogState.cancelText}
+          showCancel={dialogState.showCancel}
+        />
+      </>
     );
   }
 
@@ -323,6 +342,17 @@ export function AssessmentForm() {
           </Button>
         </div>
       </div>
+      <ConfirmDialog
+        isOpen={dialogState.isOpen}
+        onClose={closeDialog}
+        onConfirm={dialogState.onConfirm}
+        title={dialogState.title}
+        description={dialogState.description}
+        type={dialogState.type}
+        confirmText={dialogState.confirmText}
+        cancelText={dialogState.cancelText}
+        showCancel={dialogState.showCancel}
+      />
     </div>
   );
 }

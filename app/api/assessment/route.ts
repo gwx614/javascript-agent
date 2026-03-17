@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getPrisma } from "@/lib/core/db";
-import { STAGES, type StageNode } from "@/lib/core/config";
-import type { AssessmentQuestion } from "@/types";
+import { STAGES } from "@/lib/core/config";
+import { type StageNode, type AssessmentQuestion } from "@/types";
 
 const prisma = getPrisma();
 
@@ -256,7 +256,7 @@ JSON.parse()
         ? parsed
         : Object.values(parsed).find(Array.isArray) || [];
 
-      const cleanedArray = finalArray.map((q: AssessmentQuestion) => {
+      const cleanedArray = finalArray.map((q: any) => {
         if (!q.questionText && q.question) q.questionText = q.question;
         if (typeof q.hasCode !== "boolean") q.hasCode = false;
         if (!q.codeBlock) q.codeBlock = "";

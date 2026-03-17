@@ -2,9 +2,9 @@
 
 import { useUserStore } from "@/store/useUserStore";
 import {
-  DiagnosisReport as DiagnosisReportType,
-  KnowledgePointStatus,
-  QuestionAnalysis,
+  type DiagnosisReport as DiagnosisReportType,
+  type KnowledgePointStatus,
+  type QuestionAnalysis,
 } from "@/types";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -258,11 +258,11 @@ export function DiagnosisReport({ report, questions = [], onStartLearning }: Dia
                     {/* 掌握度文字 + 角色提示 */}
                     <div className="flex items-center justify-between">
                       <span className="text-xs text-muted-foreground">
-                        {getMasteryLabel(kp.mastery)}
+                        {getMasteryLabel(kp.status)}
                       </span>
-                      {kp.note && (
+                      {kp.teachingAdvice && (
                         <span className="max-w-[60%] truncate text-right text-xs font-medium text-primary/80">
-                          💡 {kp.note}
+                          💡 {kp.teachingAdvice}
                         </span>
                       )}
                     </div>

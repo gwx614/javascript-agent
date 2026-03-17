@@ -10,6 +10,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { FinalLearningReport } from "./FinalLearningReport";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { useConfirmDialog } from "@/hooks/useConfirmDialog";
 
 interface AssessmentQuestion {
   id: string;
@@ -36,6 +38,7 @@ export function PostCourseAssessmentForm({
   }, [selectedCourseId, stageStates]);
   const finalReport = useUserStore((state) => state.finalReport);
   const setFinalReport = useUserStore((state) => state.setFinalReport);
+  const { dialogState, closeDialog, showWarning, showError } = useConfirmDialog();
 
   const [questions, setQuestions] = useState<AssessmentQuestion[]>([]);
   const [answers, setAnswers] = useState<Record<string, string | string[]>>({});
@@ -109,7 +112,10 @@ export function PostCourseAssessmentForm({
     });
 
     if (unanswered.length > 0) {
-      alert("请完成所有题目，让我们更准确地评估你的进步！");
+      showWarning(
+        "还有未完成的题目",
+        `你还有 ${unanswered.length} 道题目未完成，请完成所有题目，让我们更准确地评估你的进步！`
+      );
       return;
     }
 
@@ -128,7 +134,7 @@ export function PostCourseAssessmentForm({
       });
       const data = await res.json();
       if (data.error) {
-        alert(data.error);
+        showError("提交失败", data.error);
       } else if (data.report) {
         setFinalReport(data.report);
         if (selectedCourseId) {
@@ -136,7 +142,7 @@ export function PostCourseAssessmentForm({
         }
       }
     } catch (err) {
-      alert("生成报告失败，请重试。");
+      showError("生成报告失败", "生成报告失败，请重试。");
     } finally {
       setSubmitting(false);
     }
@@ -290,6 +296,17 @@ export function PostCourseAssessmentForm({
           </Button>
         </div>
       </div>
+      <ConfirmDialog
+        isOpen={dialogState.isOpen}
+        onClose={closeDialog}
+        onConfirm={dialogState.onConfirm}
+        title={dialogState.title}
+        description={dialogState.description}
+        type={dialogState.type}
+        confirmText={dialogState.confirmText}
+        cancelText={dialogState.cancelText}
+        showCancel={dialogState.showCancel}
+      />
     </div>
   );
 }

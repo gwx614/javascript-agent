@@ -4,7 +4,7 @@ import { useUserStore } from "@/store/useUserStore";
 import { useLearningStore } from "@/store/useLearningStore";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Trophy, ArrowLeft, ArrowRight, Target, Zap, RotateCcw } from "lucide-react";
+import { Trophy, ArrowLeft, ArrowRight, Target, Zap, RotateCcw, BookOpen } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export function FinalLearningReport({
@@ -61,6 +61,46 @@ export function FinalLearningReport({
 
   const handleNextStep = () => {
     onSelectNextCourse();
+  };
+
+  const handleBackToLearning = async () => {
+    // 1. 调用后端API同步更新状态
+    const user = useUserStore.getState().user;
+    if (user?.username && selectedCourseId) {
+      try {
+        const res = await fetch("/api/user/sync-stage", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            username: user.username,
+            courseId: selectedCourseId,
+            newStage: "STUDYING",
+          }),
+        });
+
+        if (!res.ok) {
+          let errorMessage = `HTTP ${res.status}`;
+          try {
+            const errorData = await res.json();
+            errorMessage = errorData.error || errorData.message || JSON.stringify(errorData);
+          } catch {
+            // 如果解析 JSON 失败，使用状态文本
+            errorMessage = res.statusText || `HTTP ${res.status}`;
+          }
+          console.error(`[FinalLearningReport] 后端返回错误: ${errorMessage}`);
+        }
+      } catch (error) {
+        console.error(`[FinalLearningReport] 返回学习阶段失败:`, error);
+      }
+    }
+
+    // 2. 同步更新前端状态
+    setHasCompletedCourse(false);
+    setFinalReport(null);
+    if (selectedCourseId) {
+      setStageAssessed(selectedCourseId, true);
+      useUserStore.getState().setCourseStatus(selectedCourseId, "STUDYING");
+    }
   };
 
   return (
@@ -174,6 +214,20 @@ export function FinalLearningReport({
                   </div>
                   <span className="text-sm font-medium text-muted-foreground/70">
                     夯实基础，再次挑战
+                  </span>
+                </Button>
+
+                <Button
+                  onClick={handleBackToLearning}
+                  variant="outline"
+                  className="flex h-20 flex-1 flex-col items-center justify-center gap-2 rounded-2xl border-2 border-amber-500/30 bg-amber-50 text-lg font-semibold transition-all hover:border-amber-500/50 hover:bg-amber-100 dark:bg-amber-950/20"
+                >
+                  <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400">
+                    <BookOpen className="h-5 w-5" />
+                    <span>返回学习阶段</span>
+                  </div>
+                  <span className="text-sm font-medium text-amber-600/70 dark:text-amber-400/70">
+                    继续当前阶段的学习
                   </span>
                 </Button>
 

@@ -2,7 +2,8 @@
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { STAGES, StageNode } from "@/lib/core/config";
+import { STAGES } from "@/lib/core/config";
+import { type StageNode } from "@/types";
 import { DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useUserStore } from "@/store/useUserStore";
 import { useLearningStore } from "@/store/useLearningStore";

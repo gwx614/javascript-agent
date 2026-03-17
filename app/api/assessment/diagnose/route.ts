@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getPrisma } from "@/lib/core/db";
-import { STAGES, type StageNode } from "@/lib/core/config";
-import type { AssessmentQuestion } from "@/types";
+import { STAGES } from "@/lib/core/config";
+import { type StageNode, type AssessmentQuestion } from "@/types";
 
 const prisma = getPrisma();
 

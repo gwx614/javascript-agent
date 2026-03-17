@@ -1,12 +1,9 @@
-/**
- * 嵌入生成模块
- * 使用阿里云 DashScope API 生成嵌入
- */
-
 import { getAIApiKey } from "@/lib/core/config";
+import { calculateSimilarity } from "@/lib/utils";
 
 const DASHSCOPE_EMBEDDING_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1/embeddings";
 
+export { calculateSimilarity };
 /**
  * 生成文本嵌入
  * @param text 要嵌入的文本
@@ -100,33 +97,4 @@ export async function generateBatchEmbeddings(texts: string[]): Promise<number[]
   }
 
   return embeddings;
-}
-
-export { cosineSimilarity as calculateSimilarity };
-/**
- * 计算两个向量的余弦相似度
- */
-function cosineSimilarity(vec1: number[], vec2: number[]): number {
-  if (vec1.length !== vec2.length) {
-    throw new Error("向量长度不匹配");
-  }
-
-  let dotProduct = 0;
-  let magnitude1 = 0;
-  let magnitude2 = 0;
-
-  for (let i = 0; i < vec1.length; i++) {
-    dotProduct += vec1[i] * vec2[i];
-    magnitude1 += vec1[i] * vec1[i];
-    magnitude2 += vec2[i] * vec2[i];
-  }
-
-  magnitude1 = Math.sqrt(magnitude1);
-  magnitude2 = Math.sqrt(magnitude2);
-
-  if (magnitude1 === 0 || magnitude2 === 0) {
-    return 0;
-  }
-
-  return dotProduct / (magnitude1 * magnitude2);
 }

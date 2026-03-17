@@ -4,7 +4,8 @@ import { useState, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Loader2, ArrowRight, BrainCircuit, Sparkles } from "lucide-react";
-import { formQuestions, defaultFormData, Question } from "@/lib/core/config";
+import { formQuestions, defaultFormData } from "@/lib/core/config";
+import { type Question } from "@/types";
 import { CourseSelection } from "./CourseSelection";
 import { useUserStore } from "@/store/useUserStore";
 

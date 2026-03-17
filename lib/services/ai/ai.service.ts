@@ -1,23 +1,51 @@
 import { ChatOpenAI } from "@langchain/openai";
-import {
-  createJavascriptSearchTool,
-  createWebSearchTool,
-  createDatabaseQueryTool,
-} from "@/lib/rag";
+import { createJavascriptSearchTool, createWebSearchTool, createDatabaseToolkit } from "@/lib/rag";
 import { createAgent } from "langchain";
 import { SystemMessage } from "@langchain/core/messages";
 import { getAIApiKey, DEFAULT_MODEL } from "@/lib/core/config";
-import { unwrapToolInput } from "@/lib/core/utils";
+import { type AgentOptions } from "@/types";
 
 /**
- * 通用 Agent 配置选项
+ * 核心工具函数：智能解包工具输入
+ *
+ * 背景：部分 LLM 或 LangGraph 框架在调用工具时，会自动将参数包装在 {"input": "..."} 等结构中。
  */
-export interface AgentOptions {
-  userIdentifier: string;
-  systemPrompt: string;
-  tools?: any[]; // 如果传入空数组 [], 则不使用任何工具
-  temperature?: number;
-  streaming?: boolean;
+export function unwrapToolInput(input: any): any {
+  if (input === null || input === undefined) return "";
+  let current = input;
+  if (typeof current === "object" && !Array.isArray(current)) {
+    current =
+      current.input ||
+      current.query ||
+      current.search ||
+      current.description ||
+      JSON.stringify(current);
+  }
+  let depth = 0;
+  while (
+    depth < 5 &&
+    typeof current === "string" &&
+    (current.startsWith("{") || current.startsWith("["))
+  ) {
+    try {
+      const parsed = JSON.parse(current);
+      if (parsed && typeof parsed === "object") {
+        const next = parsed.input || parsed.query || parsed.search || parsed.description;
+        if (next !== undefined && next !== current) {
+          current = next;
+        } else {
+          current = parsed;
+          break;
+        }
+      } else {
+        current = parsed;
+      }
+      depth++;
+    } catch {
+      break;
+    }
+  }
+  return current;
 }
 
 /**
@@ -48,7 +76,7 @@ export async function getGeneralAgent(options: AgentOptions) {
     tools = [
       await createJavascriptSearchTool(),
       await createWebSearchTool(),
-      await createDatabaseQueryTool(userIdentifier),
+      ...(await createDatabaseToolkit(userIdentifier)),
     ];
   } else {
     tools = customTools;

@@ -1,5 +1,5 @@
 import { DynamicTool } from "@langchain/core/tools";
-import { unwrapToolInput } from "@/lib/core/utils";
+import { unwrapToolInput } from "@/lib/services/ai/ai.service";
 
 /**
  * 创建联网搜索工具

@@ -138,7 +138,7 @@ export async function POST(req: Request) {
 
 一定要确保正确选项是随机的，不能固定为 A、B、C、D 中的一个，并且要保证正确选项的分布尽可能平均。
 一定要保证题目的正确性，在输出前验证题目的正确选项是正确的。
-共生成 5 道题。仅输出 JSON 数组，必须能通过 JSON.parse() 解析。
+共生成 3 道题。仅输出 JSON 数组，必须能通过 JSON.parse() 解析。
 绝对禁止输出任何 markdown 标记、解释文字、注释或 emoji 表情。`;
 
     const { invokeGeneralAgent } = await import("@/lib/services/ai/ai.service");
